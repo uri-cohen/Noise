@@ -1,0 +1,14 @@
+# this is a comment
+
+macro m_1 = {
+  text = <<EOF
+This is the first macro ("m_1")
+EOF
+;
+};
+
+macro m_2 = {
+  text = "the second macro contains the first: (m_1)";
+};
+
+# end

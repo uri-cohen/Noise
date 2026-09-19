@@ -1,0 +1,58 @@
+// Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+
+#pragma once
+
+#include <noise_std_include.h>
+
+namespace noise {
+
+enum class BindingAttr : unsigned {
+    NONE = 0,
+    REQUIRED = 0x1,
+    TRIM = 0x2,
+    QUOTED = 0x4,
+};
+
+inline BindingAttr operator|(BindingAttr a, BindingAttr b) {
+    return static_cast<BindingAttr>(static_cast<unsigned>(a) |
+                                     static_cast<unsigned>(b));
+}
+
+inline bool has(BindingAttr set, BindingAttr bit) {
+    return (static_cast<unsigned>(set) & static_cast<unsigned>(bit)) != 0;
+}
+
+/// @brief Binding is an immutable relation between a string name, an
+/// optional string value, and a set of attrs (REQUIRED/TRIM/QUOTED).
+/// An empty name denotes a positional (unnamed) instantiation-site entry.
+class Binding {
+  public:
+    Binding(const std::string& name, const std::string& value = "",
+            BindingAttr attrs = BindingAttr::NONE)
+        : _name(name), _value(value), _attrs(attrs) {}
+    Binding() = default;
+    Binding(const Binding& o) = default;
+
+    Binding& operator=(const Binding& o) = default;
+
+    virtual ~Binding() {}
+
+    const std::string& name() const { return _name; }
+    const std::string& value() const { return _value; }
+    BindingAttr attrs() const { return _attrs; }
+
+    bool required() const { return has(_attrs, BindingAttr::REQUIRED); }
+    bool trim() const { return has(_attrs, BindingAttr::TRIM); }
+    bool quoted() const { return has(_attrs, BindingAttr::QUOTED); }
+
+  private:
+    std::string _name;
+    std::string _value;
+    BindingAttr _attrs = BindingAttr::NONE;
+};
+
+/// @brief Throws NoiseDefBuilderError if a non-required entry precedes a
+/// required one - required params/args must be a prefix of the list.
+void validate_binding_order(const std::vector<Binding>& list);
+
+};  // namespace noise

@@ -1,0 +1,9 @@
+macro m1 = { text = "this is 'm1'"; };
+macro m2 = { text = "this is 'm2'"; };
+
+macro caller = {
+  text = "calling macro a";
+  args = {
+    a = "foo";
+  };
+};

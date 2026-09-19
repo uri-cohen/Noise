@@ -1,0 +1,13 @@
+macro show_arg = {
+  text = "got=value count=#args";
+  args = {
+    required trim quoted value = "";
+  };
+};
+
+macro show_params = {
+  text = "got=name count=#params";
+  params = {
+    required name = "";
+  };
+};

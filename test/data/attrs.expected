@@ -1,0 +1,6 @@
+1. trim (quoted no-op): got=hi count=1
+2. quoted (trim no-op): got=hi count=1
+3. named param: got=world count=1
+4. dup text: ababab
+5. pick words: alpha beta
+6. fixed random: 5

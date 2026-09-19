@@ -1,0 +1,6 @@
+1. trim (quoted no-op): show_arg(value = "  hi  ")
+2. quoted (trim no-op): show_arg(value = \"hi\")
+3. named param: show_params<name = world>
+4. dup text: repeat(text=ab,count=3)
+5. pick words: select<unit=word,count=2>(text="alpha beta gamma delta")
+6. fixed random: uniform_int<a=5,b=5>
