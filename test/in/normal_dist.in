@@ -1,0 +1,3 @@
+1. default mean=0,stddev=1,fmt=(empty) gives a raw real number: normal_dist
+2. mean=100,stddev=15 formatted as an integer looks like an IQ score: normal_dist<mean=100,stddev=15,fmt=.0f>
+3. a small stddev stays close to the mean: normal_dist<mean=42,stddev=0.001,fmt=.0f>

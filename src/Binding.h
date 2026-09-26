@@ -9,8 +9,14 @@ namespace noise {
 enum class BindingAttr : unsigned {
     NONE = 0,
     REQUIRED = 0x1,
-    TRIM = 0x2,
     QUOTED = 0x4,
+    // Whitespace trimming is the default; these opt out of it per side.
+    // "keep_enclosing_ws" (alias "kws") sets both bits.
+    KEEP_LEFT_WS = 0x8,
+    KEEP_RIGHT_WS = 0x10,
+    // The bound value is interpreted as a boolean string (see
+    // DocParser.yy's normalize_bool), not used verbatim.
+    BOOL = 0x20,
 };
 
 inline BindingAttr operator|(BindingAttr a, BindingAttr b) {
@@ -23,7 +29,8 @@ inline bool has(BindingAttr set, BindingAttr bit) {
 }
 
 /// @brief Binding is an immutable relation between a string name, an
-/// optional string value, and a set of attrs (REQUIRED/TRIM/QUOTED).
+/// optional string value, and a set of attrs
+/// (REQUIRED/QUOTED/KEEP_LEFT_WS/KEEP_RIGHT_WS).
 /// An empty name denotes a positional (unnamed) instantiation-site entry.
 class Binding {
   public:
@@ -42,8 +49,12 @@ class Binding {
     BindingAttr attrs() const { return _attrs; }
 
     bool required() const { return has(_attrs, BindingAttr::REQUIRED); }
-    bool trim() const { return has(_attrs, BindingAttr::TRIM); }
     bool quoted() const { return has(_attrs, BindingAttr::QUOTED); }
+    bool keep_left_ws() const { return has(_attrs, BindingAttr::KEEP_LEFT_WS); }
+    bool keep_right_ws() const {
+        return has(_attrs, BindingAttr::KEEP_RIGHT_WS);
+    }
+    bool is_bool() const { return has(_attrs, BindingAttr::BOOL); }
 
   private:
     std::string _name;

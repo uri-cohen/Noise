@@ -1,0 +1,18 @@
+
+macro rand_ints = {
+  text = <<EOF
+start #line,#col
+repeat(
+    count=count,
+    kws text = "
+    uniform_dist<lb, ub, fmt=.0f> ")
+end #line,#col
+EOF
+;
+  params = {
+      count = 10;
+      ub = 80;
+      lb = 30;
+  };
+};
+

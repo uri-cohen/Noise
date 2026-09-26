@@ -10,11 +10,39 @@ namespace noise {
 
 class ContextManager;
 
-class UniformIntMacro : public Macro {
+class UniformDistMacro : public Macro {
   public:
-    UniformIntMacro(NoiseFlow* owner);
-    ~UniformIntMacro() {}
+    UniformDistMacro(NoiseFlow* owner);
+    ~UniformDistMacro() {}
     std::string expand(ContextManager* context_manager) override;
-};  // class UniformIntMacro
+};  // class UniformDistMacro
+
+class ExponentialDistMacro : public Macro {
+  public:
+    ExponentialDistMacro(NoiseFlow* owner);
+    ~ExponentialDistMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class ExponentialDistMacro
+
+class NormalDistMacro : public Macro {
+  public:
+    NormalDistMacro(NoiseFlow* owner);
+    ~NormalDistMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class NormalDistMacro
+
+class BinomialDistMacro : public Macro {
+  public:
+    BinomialDistMacro(NoiseFlow* owner);
+    ~BinomialDistMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class BinomialDistMacro
+
+class PoissonDistMacro : public Macro {
+  public:
+    PoissonDistMacro(NoiseFlow* owner);
+    ~PoissonDistMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class PoissonDistMacro
 
 };  // namespace noise

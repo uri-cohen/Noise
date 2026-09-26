@@ -1,0 +1,32 @@
+This is the *basic* test
+
+1. The first macro
+   bare: 
+This is the first macro ("m_1")
+
+--------------------------------------------------
+   empty arg: 
+This is the first macro ("m_1")
+
+--------------------------------------------------
+   dummy arg: 
+This is the first macro ("m_1")
+
+--------------------------------------------------
+   empty param: 
+This is the first macro ("m_1")
+
+--------------------------------------------------
+   empty param and arg: 
+This is the first macro ("m_1")
+
+--------------------------------------------------
+2. The second macro
+   the second macro contains the first: (
+This is the first macro ("m_1")
+)
+--------------------------------------------------
+   the second macro contains the first: (
+This is the first macro ("m_1")
+)
+--------------------------------------------------

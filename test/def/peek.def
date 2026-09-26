@@ -1,0 +1,4 @@
+# a macro name directly followed by other characters (the lexer "peek" step),
+# at document level and inside param/arg lists
+macro m1 = { text = "M"; };
+macro wrap = { text = "<arg[0]>"; args = { a = ""; }; };

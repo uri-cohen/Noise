@@ -16,9 +16,11 @@ using noise::DocLexerExtra;
 
 //
 
+#include <Binding.h>
 #include <Context.h>
 #include <DocBuilder.h>
 #include <Exception.h>
+#include <Macro.h>
 #include <NoiseFlow.h>
 
 using std::string;
@@ -36,6 +38,24 @@ bool DocLexerExtra::is_macro(const std::string& id) const {
 
 std::optional<std::string> DocLexerExtra::context_value(const std::string& id) const {
     return owner->context_manager()->get(id);
+}
+
+bool DocLexerExtra::is_bool_formal(const std::string& id) const {
+    Macro* macro = owner->find_macro(pending_macro_name);
+    if (!macro) {
+        return false;
+    }
+    for (const auto& formal : macro->params()) {
+        if (formal.name() == id) {
+            return formal.is_bool();
+        }
+    }
+    for (const auto& formal : macro->args()) {
+        if (formal.name() == id) {
+            return formal.is_bool();
+        }
+    }
+    return false;
 }
 
 void DocLexerExtra::emit(const std::string& text) {
@@ -62,7 +82,11 @@ int DocBuilder::parse(const std::string& input_text) {
         DocParser parser(scanner, &_lexer_extra);
         res = parser();
     } catch (const std::exception& e) {
-        res = 1;
+        // Cleanup only: main()'s top-level catch is the single point that
+        // logs FATAL for any propagated exception.
+        doc__delete_buffer(buf, scanner);
+        doc_lex_destroy(scanner);
+        throw;
     }
     doc__delete_buffer(buf, scanner);
     doc_lex_destroy(scanner);

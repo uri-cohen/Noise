@@ -11,13 +11,27 @@
 
 namespace noise {
 
-inline std::string trim(const std::string& s) {
-    std::string::size_type last = s.find_last_not_of(" \t\n");
-    if (last == std::string::npos) {
+// Trims leading/trailing whitespace by default. keep_left/keep_right opt out
+// of trimming that respective side (see BindingAttr::KEEP_LEFT_WS/RIGHT_WS).
+inline std::string trim(const std::string& s, bool keep_left = false,
+                         bool keep_right = false) {
+    std::string::size_type begin = 0;
+    std::string::size_type end = s.size();
+    if (!keep_right) {
+        std::string::size_type last = s.find_last_not_of(" \t\n");
+        end = (last == std::string::npos) ? 0 : last + 1;
+    }
+    if (!keep_left) {
+        std::string::size_type first = s.find_first_not_of(" \t\n");
+        if (first == std::string::npos) {
+            return "";
+        }
+        begin = first;
+    }
+    if (begin >= end) {
         return "";
     }
-    std::string::size_type first = s.find_first_not_of(" \t\n");
-    return s.substr(first, last - first + 1);
+    return s.substr(begin, end - begin);
 };
 
 // '\' is an escape char: the following character is taken literally and
@@ -35,6 +49,7 @@ inline std::string unescape(const std::string& s) {
     return out;
 }
 
+// for now this code is unused...
 inline std::string align_string(const std::string& s, int col) {
     if (s.empty()) {
         return "";

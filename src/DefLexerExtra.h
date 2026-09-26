@@ -21,6 +21,7 @@ typedef void* yyscan_t;
     X(HERE_STRING_STATE) \
     X(PARAM_LIST_STATE)  \
     X(ARG_LIST_STATE)    \
+    X(DEF_VALUE_STATE)   \
     X(INCLUDE_STATE)
 
 #define X(S) void def_push_##S(yyscan_t s);

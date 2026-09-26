@@ -45,7 +45,27 @@ void noise::DocParser::error(const location_type& l, const std::string& msg) {
                            l.end.line, l.end.column, msg));
 };
 
-static std::string apply_attrs(const std::string& value, noise::BindingAttr attrs) {
+static std::string lowered(const std::string& s) {
+    std::string out = s;
+    for (auto& c : out) c = std::tolower(static_cast<unsigned char>(c));
+    return out;
+}
+
+// Case-insensitive true/false spellings for a BOOL-attributed param/arg.
+// Anything else warns and falls back to the formal's own default (itself
+// normalized the same way; "false" if that isn't a valid spelling either).
+static std::string normalize_bool(const std::string& raw, const std::string& formal_default) {
+    static const std::set<std::string> TRUE_STRINGS = {"true", "t", "yes", "y", "1", "ok"};
+    static const std::set<std::string> FALSE_STRINGS = {"false", "f", "no", "n", "0"};
+    std::string v = lowered(raw);
+    if (TRUE_STRINGS.contains(v)) return "true";
+    if (FALSE_STRINGS.contains(v)) return "false";
+    WARNING(301, "invalid bool value '{}', using default '{}'", raw, formal_default);
+    return TRUE_STRINGS.contains(lowered(formal_default)) ? "true" : "false";
+}
+
+static std::string apply_attrs(const std::string& value, noise::BindingAttr attrs,
+                                const std::string& bool_default = "false") {
     std::string v = value;
     if (noise::has(attrs, noise::BindingAttr::QUOTED) && v.size() >= 2) {
         char front = v.front(), back = v.back();
@@ -53,8 +73,12 @@ static std::string apply_attrs(const std::string& value, noise::BindingAttr attr
             v = v.substr(1, v.size() - 2);
         }
     }
-    if (noise::has(attrs, noise::BindingAttr::TRIM)) {
-        v = noise::trim(v);
+    // Trimming is the default; KEEP_LEFT_WS/KEEP_RIGHT_WS opt out per side.
+    bool keep_left = noise::has(attrs, noise::BindingAttr::KEEP_LEFT_WS);
+    bool keep_right = noise::has(attrs, noise::BindingAttr::KEEP_RIGHT_WS);
+    v = noise::trim(v, keep_left, keep_right);
+    if (noise::has(attrs, noise::BindingAttr::BOOL)) {
+        v = normalize_bool(v, bool_default);
     }
     return v;
 }
@@ -73,11 +97,16 @@ static void bind_list(const std::string& macro_name,
     std::vector<std::string> values(formals.size());
     std::set<std::string> claimed_names;
 
+    // A call-site attr (e.g. keep_left_ws on a specific actual) applies
+    // alongside whatever the formal itself declares - either side asking to
+    // keep/quote is enough, so the two attr sets are combined, not one
+    // overriding the other.
     for (const auto& a : actuals) {
         if (a.name().empty()) continue;
         for (size_t i = 0; i < formals.size(); ++i) {
             if (!resolved[i] && formals[i].name() == a.name()) {
-                values[i] = apply_attrs(a.value(), formals[i].attrs());
+                values[i] = apply_attrs(a.value(), formals[i].attrs() | a.attrs(),
+                                        formals[i].value());
                 resolved[i] = true;
                 claimed_names.insert(a.name());
                 break;
@@ -91,7 +120,9 @@ static void bind_list(const std::string& macro_name,
             ++pos_idx;
         }
         if (pos_idx < actuals.size()) {
-            values[i] = apply_attrs(actuals[pos_idx].value(), formals[i].attrs());
+            const noise::Binding& a = actuals[pos_idx];
+            values[i] = apply_attrs(a.value(), formals[i].attrs() | a.attrs(),
+                                    formals[i].value());
             resolved[i] = true;
             ++pos_idx;
         }
@@ -104,6 +135,9 @@ static void bind_list(const std::string& macro_name,
                     formals[i].name(), macro_name));
             }
             values[i] = formals[i].value();
+            if (formals[i].is_bool()) {
+                values[i] = normalize_bool(values[i], formals[i].value());
+            }
         }
         ctx.add_map(formals[i].name(), values[i]);
         ctx.add_map(std::format("{}[{}]", prefix, i), values[i]);
@@ -116,6 +150,32 @@ static void bind_list(const std::string& macro_name,
         }
     }
     ctx.add_map(std::format("#{}s", prefix), std::to_string(actuals.size()));
+}
+
+// Expansion Flow steps 7-8: re-expands `raw` as a fresh document, repeating
+// until the output stops changing, or throws if it never stabilizes. Used
+// both for a macro's own body (post step 6) and, for params, right after
+// balanced_text captures their raw value (step 4).
+static std::string expand_until_stable(noise::DocLexerExtra* extra,
+                                        const std::string& raw,
+                                        const std::string& stream_id) {
+    std::string prev = raw, curr;
+    int iterations = 0;
+    constexpr int MAX_ITERATIONS = 64;
+    do {
+        std::ostringstream tmp;
+        extra->owner->stream_expand(prev, stream_id, tmp);
+        curr = tmp.str();
+        if (curr == prev) {
+            break;
+        }
+        prev = curr;
+    } while (++iterations < MAX_ITERATIONS);
+    if (iterations >= MAX_ITERATIONS) {
+        throw noise::NoiseMacroCallError(std::format(
+            "possible infinite expansion while expanding '{}'", stream_id));
+    }
+    return prev;
 }
 
 static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& name,
@@ -135,23 +195,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     std::string raw = macro->expand(extra->owner->context_manager());
     extra->owner->context_manager()->pop();
 
-    std::string prev = raw, curr;
-    int iterations = 0;
-    constexpr int MAX_ITERATIONS = 64;
-    do {
-        std::ostringstream tmp;
-        extra->owner->stream_expand(prev, std::format("macro:{}", name), tmp);
-        curr = tmp.str();
-        if (curr == prev) {
-            break;
-        }
-        prev = curr;
-    } while (++iterations < MAX_ITERATIONS);
-    if (iterations >= MAX_ITERATIONS) {
-        throw noise::NoiseMacroCallError(std::format(
-            "possible infinite expansion in macro '{}'", name));
-    }
-    return prev;
+    return expand_until_stable(extra, raw, std::format("macro:{}", name));
 }
 
 }
@@ -163,10 +207,14 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 %token <std::string> NO_COMMA_TEXT
 %token <std::string> NO_Q_LINE
 %token <std::string> NO_QQ_LINE
+%token <std::string> ESCAPED_CHAR
 %token <std::string> ID
 %token REQUIRED
-%token TRIM
+%token KEEP_LEFT_WS
+%token KEEP_RIGHT_WS
+%token KEEP_ENCLOSING_WS
 %token QUOTED
+%token BOOL
 
 %nterm document
 %nterm <std::string> expandable
@@ -179,6 +227,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 %nterm <noise::BindingAttr> opt_attrs
 %nterm <std::string> opt_id_eq
 %nterm <std::string> balanced_text
+%nterm <std::string> balanced_text_list
 %nterm <std::string> quoted_text
 %nterm <std::string> quoted_text_verbatim
 %nterm <std::string> no_q_lines
@@ -191,24 +240,32 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 document:
     %empty
     | document TEXT { extra->emit($2); }
+    | document ESCAPED_CHAR { extra->emit($2); }
     | document expandable { extra->emit($2); }
     | document quoted_text_verbatim { extra->emit($2); }
     ;
 
 /* A quoted span never has its content interpreted as a macro reference; at
  * document level (unlike inside a param/arg value) the quote characters
- * themselves are part of the literal text and are echoed verbatim. */
+ * themselves are part of the literal text and are echoed verbatim. Its
+ * content needs no unescape() pass: NO_Q_LINE/NO_QQ_LINE never contain a
+ * '\' (see DocLexer.l), and any escape within the span already arrived
+ * resolved, as its own ESCAPED_CHAR token. */
 quoted_text_verbatim:
-    '\'' no_q_lines '\'' {
-        $$ = "'" + noise::unescape($2) + "'";
+    '\'' { doc_push_Q_STRING_STATE(yyscanner); } no_q_lines '\'' {
+        $$ = "'" + $3 + "'";
     }
-    | '"' no_qq_lines '"' {
-        $$ = "\"" + noise::unescape($2) + "\"";
+    | '"' { doc_push_QQ_STRING_STATE(yyscanner); } no_qq_lines '"' {
+        $$ = "\"" + $3 + "\"";
     }
     ;
 
 expandable:
     MACRO {
+        // Lets the lexer recognize a bare "name" entry (no "=value") as a
+        // flag for one of *this* macro's own BOOL-attributed formals (see
+        // is_bool_formal / the {ID} rule in DocLexer.l).
+        extra->pending_macro_name = $1;
         doc_push_EXPECT_PARAMS_STATE(yyscanner);
     } opt_params {
         doc_pop_state(yyscanner);
@@ -226,14 +283,22 @@ opt_params:
     %empty { $$ = std::vector<noise::Binding>(); }
     | '<' {
         doc_push_PARAM_VALUES_STATE(yyscanner);
-    } param_list '>' { $$ = $3; }
+        extra->item_head = true;
+        extra->after_id = false;
+    } param_list '>' {
+        $$ = $3;
+    }
     ;
 
 opt_args:
     %empty { $$ = std::vector<noise::Binding>(); }
     | '(' {
         doc_push_ARG_VALUES_STATE(yyscanner);
-    } arg_list ')' { $$ = $3; }
+        extra->item_head = true;
+        extra->after_id = false;
+    } arg_list ')' {
+        $$ = $3;
+    }
     ;
 
 param_list:
@@ -246,19 +311,38 @@ arg_list:
     | arg_list ',' arg { $$ = $1; $$.push_back($3); }
     ;
 
+/* Expansion Flow step 4: a param's raw captured text is expanded right away,
+ * so its formal binding sees the fully-resolved value (see bind_list). An
+ * arg's raw text is kept as-is (step 2's "passed as is") - it is only ever
+ * expanded later, if and when the invoked macro's body references it. */
+/* A bare name - no "=value" at all - is only ever lexed as a standalone ID
+ * here when it names a BOOL-attributed formal of the macro being called
+ * (see is_bool_formal); anything else still lexes as ordinary balanced_text
+ * (context lookup, then plain positional text), so this can't collide with
+ * passing a bare word as a positional value. */
 param:
-    opt_attrs opt_id_eq balanced_text { $$ = noise::Binding($2, $3, $1); }
+    opt_attrs opt_id_eq balanced_text {
+        $$ = noise::Binding($2, expand_until_stable(extra, $3, "param"), $1);
+    }
+    | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;
 
 arg:
     opt_attrs opt_id_eq balanced_text { $$ = noise::Binding($2, $3, $1); }
+    | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;
 
 opt_attrs:
     %empty { $$ = noise::BindingAttr::NONE; }
     | opt_attrs REQUIRED { $$ = $1 | noise::BindingAttr::REQUIRED; }
-    | opt_attrs TRIM { $$ = $1 | noise::BindingAttr::TRIM; }
+    | opt_attrs KEEP_LEFT_WS { $$ = $1 | noise::BindingAttr::KEEP_LEFT_WS; }
+    | opt_attrs KEEP_RIGHT_WS { $$ = $1 | noise::BindingAttr::KEEP_RIGHT_WS; }
+    | opt_attrs KEEP_ENCLOSING_WS {
+          $$ = $1 | noise::BindingAttr::KEEP_LEFT_WS |
+               noise::BindingAttr::KEEP_RIGHT_WS;
+      }
     | opt_attrs QUOTED { $$ = $1 | noise::BindingAttr::QUOTED; }
+    | opt_attrs BOOL { $$ = $1 | noise::BindingAttr::BOOL; }
     ;
 
 opt_id_eq:
@@ -266,30 +350,50 @@ opt_id_eq:
     | ID '=' { $$ = $1; }
     ;
 
+/* Captures a param/arg's raw source text verbatim - it does not itself
+ * recognize or expand macro calls (see expandable's callers instead). A
+ * "(...)" or "<...>" group found here need not be a macro call at all (e.g.
+ * literal text such as "f(a,b)"): it is just balanced text, matched purely
+ * to find its end without miscounting the enclosing list's own ',' / close,
+ * and reproduced verbatim. balanced_text_list's own balanced_text can be
+ * empty, so a bare "()" / "<>" is already covered without a separate rule. */
 balanced_text:
     %empty { $$ = std::string(); }
-    | balanced_text NO_COMMA_TEXT { $$ = $1 + noise::unescape($2); }
-    | balanced_text expandable { $$ = $1 + $2; }
+    | balanced_text NO_COMMA_TEXT { $$ = $1 + $2; }
+    | balanced_text ESCAPED_CHAR { $$ = $1 + $2; }
+    | balanced_text '(' balanced_text_list ')' { $$ = $1 + "(" + $3 + ")"; }
+    | balanced_text '<' balanced_text_list '>' { $$ = $1 + "<" + $3 + ">"; }
     | balanced_text quoted_text { $$ = $1 + $2; }
+    // #line/#params-style lookups still resolve immediately (see the {ID}
+    // rule comment in DocLexer.l) - their resolved text is spliced in here
+    // like any other already-known piece of the captured value.
+    | balanced_text CONTEXT_VALUE { $$ = $1 + $2; }
+    ;
+
+balanced_text_list:
+    balanced_text { $$ = $1; }
+    | balanced_text_list ',' balanced_text { $$ = $1 + "," + $3; }
     ;
 
 quoted_text:
-    '\'' no_q_lines '\'' {
-        $$ = noise::unescape($2);
+    '\'' { doc_push_Q_STRING_STATE(yyscanner); } no_q_lines '\'' {
+        $$ = $3;
     }
-    | '"' no_qq_lines '"' {
-        $$ = noise::unescape($2);
+    | '"' { doc_push_QQ_STRING_STATE(yyscanner); } no_qq_lines '"' {
+        $$ = $3;
     }
     ;
 
 no_q_lines:
     %empty { $$ = std::string(); }
     | no_q_lines NO_Q_LINE { $$ = $1 + $2; }
+    | no_q_lines ESCAPED_CHAR { $$ = $1 + $2; }
     ;
 
 no_qq_lines:
     %empty { $$ = std::string(); }
     | no_qq_lines NO_QQ_LINE { $$ = $1 + $2; }
+    | no_qq_lines ESCAPED_CHAR { $$ = $1 + $2; }
     ;
 
 %%

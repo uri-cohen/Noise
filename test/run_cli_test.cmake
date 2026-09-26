@@ -1,5 +1,5 @@
 # Runs the noise binary against a def/doc pair and diffs its stdout against
-# the recorded .expected file. Invoked by ctest via CMakeLists.txt's
+# the recorded .ex file. Invoked by ctest via CMakeLists.txt's
 # add_cli_test(); expects NOISE_EXE, DEF_FILE, IN_FILE, EXPECTED_FILE.
 
 execute_process(

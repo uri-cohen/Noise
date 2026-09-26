@@ -1,0 +1,3 @@
+1. default lambda=1,fmt=(empty) gives a raw real number: exp_dist
+2. lambda=2 with a 3-decimal fmt: exp_dist<lambda=2,fmt=.3f>
+3. a small lambda widens the spread, formatted as an integer: exp_dist<lambda=0.01,fmt=.0f>

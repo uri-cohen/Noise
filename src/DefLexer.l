@@ -4,6 +4,7 @@
 %{
 
 #include <DefLexerExtra.h>
+#include <Utils.h>
 using noise::DefLexerExtra;
 using std::string;
 
@@ -39,19 +40,21 @@ using std::string;
 %x HERE_STRING_STATE
 %x PARAM_LIST_STATE
 %x ARG_LIST_STATE
+%x DEF_VALUE_STATE
 %x INCLUDE_STATE
 
 %%
 
-<*>{
+<INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE,DEF_VALUE_STATE,INCLUDE_STATE>{
 [ \t]+		{ yyextra->loc.step(); }
 \n		    { yyextra->loc.lines(1); yyextra->loc.step(); }
-<<EOF>>     { yyterminate(); }
 }
+<*><<EOF>>  { yyterminate(); }
 
 <INITIAL>#.*            {}
 <PARAM_LIST_STATE>#.*   {}
 <ARG_LIST_STATE>#.*     {}
+<DEF_VALUE_STATE>#.*    {}
 
 <INITIAL>MACRO  {
     return noise::DefParser::make_MACRO(yyextra->loc);
@@ -69,21 +72,26 @@ using std::string;
     return noise::DefParser::make_ARGS(yyextra->loc);
 }
 
-<Q_STRING_STATE>([^'\n]|\\')* {
+    /* string states are verbatim: each token is one line including its '\n' */
+<Q_STRING_STATE>([^'\n]|\\')+\n?|\n {
+    if (yytext[yyleng-1] == '\n') yyextra->loc.lines(1);
     return noise::DefParser::make_ANY_STRING_LINE(yytext, yyextra->loc);
 }
-<QQ_STRING_STATE>([^\"\n]|\\\")* {
+<QQ_STRING_STATE>([^\"\n]|\\\")+\n?|\n {
+    if (yytext[yyleng-1] == '\n') yyextra->loc.lines(1);
     return noise::DefParser::make_ANY_STRING_LINE(yytext, yyextra->loc);
 }
 <INITIAL>\<\< {
     return noise::DefParser::make_LEFT_SHIFT(yyextra->loc);
 }
-<HERE_STRING_STATE>.* {
-    if (string(yytext) == yyextra->delimiter) {
-        return noise::DefParser::make_DELIMITER(yytext, yyextra->loc);
-    } else {
-        return noise::DefParser::make_ANY_STRING_LINE(yytext, yyextra->loc);
+<HERE_STRING_STATE>.+\n?|\n {
+    string line(yytext);
+    bool nl = line.ends_with('\n');
+    if (nl) { line.pop_back(); yyextra->loc.lines(1); }
+    if (line == yyextra->delimiter) {
+        return noise::DefParser::make_DELIMITER(line, yyextra->loc);
     }
+    return noise::DefParser::make_ANY_STRING_LINE(yytext, yyextra->loc);
 }
 
 <INCLUDE_STATE>[^>\n]+ {
@@ -92,8 +100,22 @@ using std::string;
 
 <PARAM_LIST_STATE,ARG_LIST_STATE>{
 required { return noise::DefParser::make_REQUIRED(yyextra->loc); }
-trim     { return noise::DefParser::make_TRIM(yyextra->loc); }
+keep_left_ws|klws { return noise::DefParser::make_KEEP_LEFT_WS(yyextra->loc); }
+keep_right_ws|krws { return noise::DefParser::make_KEEP_RIGHT_WS(yyextra->loc); }
+keep_enclosing_ws|kws { return noise::DefParser::make_KEEP_ENCLOSING_WS(yyextra->loc); }
 quoted   { return noise::DefParser::make_QUOTED(yyextra->loc); }
+bool     { return noise::DefParser::make_BOOL(yyextra->loc); }
+}
+
+ /* A param/arg value needs no quoting when it has none of the characters
+  * that give quoting a reason to exist: ';' ends the entry, '#' starts a
+  * comment, and a quote char starts one of the quoted forms. Whitespace
+  * around it is trimmed (there is no quote to mark exact boundaries), but
+  * internal whitespace is kept, so this still allows a bare multi-word
+  * value. Only reached once '=' is actually shifted (see param_list/
+  * arg_list in DefParser.yy). */
+<DEF_VALUE_STATE>[^;#'\"\n]+ {
+    return noise::DefParser::make_BARE_STRING(noise::trim(string(yytext)), yyextra->loc);
 }
 
 <INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE>[[:alpha:]][[:alnum:]_]*   {

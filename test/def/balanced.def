@@ -1,0 +1,40 @@
+macro show_arg = {
+  text = "got=[value]";
+  args = {
+    required value = "";
+  };
+};
+
+macro show2_args = {
+  text = "first=[arg0] second=[arg1]";
+  args = {
+    required arg0 = "";
+    required arg1 = "";
+  };
+};
+
+macro show_param = {
+  text = "got=[myparam]";
+  params = {
+    required myparam = "";
+  };
+};
+
+macro echo_param = {
+  text = "[p]";
+  params = {
+    p = "";
+  };
+};
+
+# A context-bound identifier used inside a nested macro call's own param
+# list, reached only once the deferred arg text is re-expanded later. The
+# lexer resolves "outer" as a CONTEXT_VALUE (it is a bound param of the
+# enclosing macro) even though it is just plain text at the point it is
+# first captured - balanced_text must still accept that token.
+macro wrap_deferred = {
+  text = 'repeat(count=2, text = "echo_param<outer>")';
+  params = {
+    outer = "X";
+  };
+};

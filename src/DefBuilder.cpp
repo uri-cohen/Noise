@@ -42,7 +42,7 @@ DefBuilder::DefBuilder(NoiseFlow* owner, const std::string& file_name)
 int DefBuilder::parse() {
     FILE* in_file = fopen(std::filesystem::path(_file_name).c_str(), "r");
     if (!in_file) {
-        throw NoiseIOError(format("filed opening {}", _file_name));
+        throw NoiseIOError(format("failed opening {}", _file_name));
     }
     yyscan_t scanner;
     def_lex_init_extra(&_lexer_extra, &scanner);
@@ -52,7 +52,11 @@ int DefBuilder::parse() {
         DefParser parser(scanner, &_lexer_extra);
         res = parser();
     } catch (const std::exception& e) {
-        res = 1;
+        // Cleanup only: main()'s top-level catch is the single point that
+        // logs FATAL for any propagated exception.
+        def_lex_destroy(scanner);
+        fclose(in_file);
+        throw;
     }
     def_lex_destroy(scanner);
     fclose(in_file);

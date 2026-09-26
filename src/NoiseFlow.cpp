@@ -15,7 +15,11 @@ namespace noise {
 
 NoiseFlow::NoiseFlow(uint64_t seed)
     : _context_manager(new ContextManager()), _gen(seed) {
-    add_macro(new UniformIntMacro(this));
+    add_macro(new UniformDistMacro(this));
+    add_macro(new ExponentialDistMacro(this));
+    add_macro(new NormalDistMacro(this));
+    add_macro(new BinomialDistMacro(this));
+    add_macro(new PoissonDistMacro(this));
     add_macro(new RepeatMacro(this));
     add_macro(new SelectMacro(this));
 }

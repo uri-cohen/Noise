@@ -1,0 +1,52 @@
+macro show_arg = {
+  text = "got=[value]";
+  args = {
+    required value = "";
+  };
+};
+
+macro show_arg_quoted = {
+  text = "got=[value]";
+  args = {
+    required quoted value = "";
+  };
+};
+
+macro show_arg_left = {
+  text = "got=[value]";
+  args = {
+    required keep_left_ws value = "";
+  };
+};
+
+macro show_arg_right = {
+  text = "got=[value]";
+  args = {
+    required krws value = "";
+  };
+};
+
+macro show_arg_enclosing = {
+  text = "got=[value]";
+  args = {
+    required keep_enclosing_ws value = "";
+  };
+};
+
+macro show_arg_aliases = {
+  text = "got=[value]";
+  args = {
+    required klws krws value = "";
+  };
+};
+
+macro show_raw_arg0 = {
+  text = "raw=[arg[0]]";
+};
+
+macro show_params = {
+  text = "got=name count=#params";
+  params = {
+    required name = "";
+  };
+};

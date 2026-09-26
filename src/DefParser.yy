@@ -90,14 +90,18 @@ void finalize(noise::DefLexerExtra* extra) {
 %token <std::string> ANY_STRING_LINE
 %token <std::string> DELIMITER
 %token <std::string> FILE_NAME
+%token <std::string> BARE_STRING
 %token MACRO
 %token INCLUDE
 %token TEXT
 %token PARAMS
 %token ARGS
 %token REQUIRED
-%token TRIM
+%token KEEP_LEFT_WS
+%token KEEP_RIGHT_WS
+%token KEEP_ENCLOSING_WS
 %token QUOTED
+%token BOOL
 
 %nterm def_file
 %nterm defs
@@ -107,6 +111,7 @@ void finalize(noise::DefLexerExtra* extra) {
 %nterm <std::string> no_double_q_string
 %nterm <std::string> no_single_q_string
 %nterm <std::string> quoted_string
+%nterm <std::string> value
 %nterm <std::string> here_string
 %nterm <std::string> any_string
 %nterm param_list
@@ -183,7 +188,7 @@ quoted_string:
 no_double_q_string:
     %empty { $$ = std::string(); }
     | no_double_q_string ANY_STRING_LINE {
-        $$ = $1 + ($1.empty() ? "" : "\n") + $2;
+        $$ = $1 + $2;
     }
 
 no_single_q_string:
@@ -191,7 +196,7 @@ no_single_q_string:
         $$ = std::string();
     }
     | no_single_q_string ANY_STRING_LINE {
-        $$ = $1 + ($1.empty() ? "" : "\n") + $2;
+        $$ = $1 + $2;
     }
 
 here_string:
@@ -207,28 +212,48 @@ here_string:
 any_string:
     %empty { $$ = std::string(); }
     | any_string ANY_STRING_LINE {
-          $$ = $1 + ($1.empty() ? "" : "\n") + $2;
+          $$ = $1 + $2;
       }
 
 param_list:
     %empty
-    | param_list attrs ID '=' quoted_string ';' {
-          extra->curr_params.emplace_back($3, $5, $2);
+    | param_list attrs ID '=' {
+          def_push_DEF_VALUE_STATE(yyscanner);
+      } value ';' {
+          def_pop_state(yyscanner);
+          extra->curr_params.emplace_back($3, $6, $2);
       }
     ;
 
 arg_list:
     %empty
-    | arg_list attrs ID '=' quoted_string ';' {
-          extra->curr_args.emplace_back($3, $5, $2);
+    | arg_list attrs ID '=' {
+          def_push_DEF_VALUE_STATE(yyscanner);
+      } value ';' {
+          def_pop_state(yyscanner);
+          extra->curr_args.emplace_back($3, $6, $2);
       }
+    ;
+
+/* A value needs quoting only when it actually requires it (to hold ';', '#',
+ * a quote char, or exact/multi-line whitespace); otherwise a bare run of
+ * text works just as well. */
+value:
+    quoted_string { $$ = $1; }
+    | BARE_STRING { $$ = $1; }
     ;
 
 attrs:
     %empty      { $$ = noise::BindingAttr::NONE; }
     | attrs REQUIRED { $$ = $1 | noise::BindingAttr::REQUIRED; }
-    | attrs TRIM     { $$ = $1 | noise::BindingAttr::TRIM; }
+    | attrs KEEP_LEFT_WS { $$ = $1 | noise::BindingAttr::KEEP_LEFT_WS; }
+    | attrs KEEP_RIGHT_WS { $$ = $1 | noise::BindingAttr::KEEP_RIGHT_WS; }
+    | attrs KEEP_ENCLOSING_WS {
+          $$ = $1 | noise::BindingAttr::KEEP_LEFT_WS |
+               noise::BindingAttr::KEEP_RIGHT_WS;
+      }
     | attrs QUOTED   { $$ = $1 | noise::BindingAttr::QUOTED; }
+    | attrs BOOL     { $$ = $1 | noise::BindingAttr::BOOL; }
     ;
 
 %%

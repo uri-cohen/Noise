@@ -1,0 +1,6 @@
+macro show = {
+  text = "[value]";
+  args = {
+    value = "";
+  };
+};
