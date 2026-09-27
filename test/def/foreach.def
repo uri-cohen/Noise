@@ -1,0 +1,7 @@
+
+macro wrap = {
+  text = "<[value]>";
+  args = {
+    value = "";
+  };
+};

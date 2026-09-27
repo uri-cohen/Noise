@@ -1,0 +1,11 @@
+1. default var name "item", word unit, default trimming collapses the templates own spacing: foreach(items="alpha beta gamma", text="[item] ")
+2. custom var name, kws text preserves the templates own trailing space: foreach<var=w>(items="x y z", kws text="(w) ")
+3. line unit: foreach<unit=line>(items="one
+two
+three", kws text="- item
+")
+4. paragraph unit, nested macro call: foreach<unit=paragraph,var=p>(items="first para
+still first
+
+second para", kws text="wrap(value=p)
+")

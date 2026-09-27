@@ -22,6 +22,7 @@ NoiseFlow::NoiseFlow(uint64_t seed)
     add_macro(new PoissonDistMacro(this));
     add_macro(new RepeatMacro(this));
     add_macro(new SelectMacro(this));
+    add_macro(new ForeachMacro(this));
 }
 
 NoiseFlow::~NoiseFlow() {
