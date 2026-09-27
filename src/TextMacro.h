@@ -37,4 +37,11 @@ class SelectMacro : public Macro {
     std::string expand(ContextManager* context_manager) override;
 };  // class SelectMacro
 
+class ForeachMacro : public Macro {
+  public:
+    ForeachMacro(NoiseFlow* owner);
+    ~ForeachMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class ForeachMacro
+
 };  // namespace noise

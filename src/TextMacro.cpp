@@ -120,4 +120,29 @@ string SelectMacro::expand(ContextManager* context_manager) {
     return out.str();
 }
 
+ForeachMacro::ForeachMacro(NoiseFlow* owner) : Macro("foreach") {
+    set_owner(owner);
+    add_arg(Binding("items", "", BindingAttr::REQUIRED));
+    add_arg(Binding("text", "", BindingAttr::REQUIRED));
+    add_param(Binding("unit", "word"));
+    add_param(Binding("var", "item"));
+}
+
+string ForeachMacro::expand(ContextManager* context_manager) {
+    string items = context_manager->get("items").value_or("");
+    string text = context_manager->get("text").value_or("");
+    string unit = context_manager->get("unit").value_or("word");
+    string var = context_manager->get("var").value_or("item");
+
+    std::ostringstream out;
+    for (const string& item : split_by_unit(items, unit)) {
+        Context ctx;
+        ctx.add_map(var, item);
+        context_manager->push(std::move(ctx));
+        owner()->stream_expand(text, format("macro:{}:{}", name(), var), out);
+        context_manager->pop();
+    }
+    return out.str();
+}
+
 };  // namespace noise
