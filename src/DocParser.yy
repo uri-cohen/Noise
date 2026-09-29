@@ -220,7 +220,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     bool has_vars = macro->vars() != nullptr;
     if (has_vars) {
         noise::Context vars_ctx;
-        for (const auto& [k, v] : noise::resolve_vars(*macro->vars(), cm, extra->owner->gen())) {
+        for (const auto& [k, v] : extra->owner->var_solver()->resolve(*macro->vars(), cm, extra->owner->gen())) {
             vars_ctx.add_map(k, v);
         }
         cm->push(std::move(vars_ctx));

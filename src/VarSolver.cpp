@@ -42,8 +42,8 @@ class Resolver {
   public:
     // Config params (see namespace config in Context.h) are read here, as
     // seen from the scope the VARS block is resolved in.
-    Resolver(ContextManager* cm, std::mt19937_64& gen)
-        : _solver(_ctx), _cm(cm), _gen(gen),
+    Resolver(z3::context& ctx, ContextManager* cm, std::mt19937_64& gen)
+        : _ctx(ctx), _solver(ctx), _cm(cm), _gen(gen),
           _max_probes(cm ? cm->config_int(config::MAX_PROBES,
                                           config::MAX_PROBES_DEFAULT, 0)
                          : config::MAX_PROBES_DEFAULT),
@@ -53,6 +53,10 @@ class Resolver {
         z3::params p(_ctx);
         p.set("random_seed", static_cast<unsigned>(_gen() & 0xffffffffu));
         _solver.set(p);
+        // A push up front puts the solver in its incremental mode right
+        // away - cheaper than the non-incremental first check it otherwise
+        // starts with (and then abandons once probing pushes).
+        _solver.push();
     }
 
     std::map<string, string> resolve(const VarBlock& block) {
@@ -74,7 +78,7 @@ class Resolver {
             }
         }
 
-        if (_solver.check() != z3::sat) {
+        if (check() != z3::sat) {
             return fallbacks();
         }
         std::vector<size_t> order(_vars.size());
@@ -83,7 +87,8 @@ class Resolver {
         for (size_t i : order) {
             probe(_vars[i]);
         }
-        if (_solver.check() != z3::sat) {
+        // Only re-check if the last check (a failed probe) left no model.
+        if (!_model_valid && check() != z3::sat) {
             throw NoiseInternalError("VARS solver lost satisfiability while probing");
         }
         z3::model m = _solver.get_model();
@@ -100,8 +105,10 @@ class Resolver {
         z3::expr e;
     };
 
-    z3::context _ctx;
+    z3::context& _ctx;
     z3::solver _solver;
+    // whether the last check was SAT, i.e. the solver holds a current model
+    bool _model_valid = false;
     ContextManager* _cm;
     std::mt19937_64& _gen;
     // max solver checks spent on probing a single variable's random value
@@ -480,10 +487,16 @@ class Resolver {
     // -------------------------------------------------------------- probing
 
     // Adds c to the solver if it keeps it satisfiable (the push is kept).
+    z3::check_result check() {
+        z3::check_result r = _solver.check();
+        _model_valid = r == z3::sat;
+        return r;
+    }
+
     bool try_add(const z3::expr& c) {
         _solver.push();
         _solver.add(c);
-        if (_solver.check() == z3::sat) {
+        if (check() == z3::sat) {
             return true;
         }
         _solver.pop();
@@ -636,11 +649,19 @@ class Resolver {
 
 }  // namespace
 
-std::map<string, string> resolve_vars(const VarBlock& block,
-                                      ContextManager* context_manager,
-                                      std::mt19937_64& gen) {
+struct VarSolver::Impl {
+    z3::context ctx;
+};
+
+VarSolver::VarSolver() : _impl(new Impl) {}
+
+VarSolver::~VarSolver() { delete _impl; }
+
+std::map<string, string> VarSolver::resolve(const VarBlock& block,
+                                            ContextManager* context_manager,
+                                            std::mt19937_64& gen) {
     try {
-        Resolver resolver(context_manager, gen);
+        Resolver resolver(_impl->ctx, context_manager, gen);
         return resolver.resolve(block);
     } catch (const z3::exception& e) {
         throw NoiseValueError(format("VARS solver: {}", e.msg()));

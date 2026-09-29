@@ -11,6 +11,7 @@ namespace noise {
 class Macro;
 class ContextManager;
 class VarBlock;
+class VarSolver;
 
 class NoiseFlow {
   public:
@@ -32,6 +33,7 @@ class NoiseFlow {
     Macro* find_macro(const std::string& id) const;
     std::mt19937_64& gen() { return _gen; }
     ContextManager* context_manager() const { return _context_manager; }
+    VarSolver* var_solver() const { return _var_solver; }
 
     bool is_expandable(const std::string& id) const;
 
@@ -52,6 +54,7 @@ class NoiseFlow {
 
   private:
     ContextManager* _context_manager;
+    VarSolver* _var_solver;
     std::map<std::string,Macro*> _macros;
     std::mt19937_64 _gen;
     std::vector<std::filesystem::path> _include_dirs;

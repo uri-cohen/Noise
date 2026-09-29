@@ -54,6 +54,32 @@ function(add_cli_error_test test_name)
     )
 endfunction()
 
+# Performance regression check: runs a def/doc pair like add_cli_test (but
+# without diffing its randomized output) and fails if it takes longer than
+# budget_ms x NOISE_PERF_SCALE. The base budgets leave a wide margin (~10x)
+# over a current machine; a slower host scales them up (see
+# run_perf_test.cmake's failure message). Labeled "perf": ctest -LE perf
+# skips them, ctest -L perf runs only them.
+set(NOISE_PERF_SCALE 1 CACHE STRING
+    "Whole number multiplier of the performance tests' time budgets (a slower host needs more)")
+
+function(add_cli_perf_test test_name budget_ms)
+    string(JOIN "|" extra_args ${ARGN})
+    add_test(
+        NAME perf_${test_name}
+        COMMAND ${CMAKE_COMMAND}
+            -DNOISE_EXE=$<TARGET_FILE:noise>
+            "-DEXTRA_ARGS=${extra_args}"
+            -DTEST_NAME=${test_name}
+            -DBUDGET_MS=${budget_ms}
+            -DSCALE=${NOISE_PERF_SCALE}
+            -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
+            -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_perf_test.cmake
+    )
+    set_tests_properties(perf_${test_name} PROPERTIES LABELS perf)
+endfunction()
+
 add_cli_test(basic)
 add_cli_test(args)
 add_cli_test(attrs)
@@ -80,3 +106,6 @@ add_cli_error_test(depth_self_recursion)
 add_cli_test(expansion_limit -D NOISE_MAX_EXPANSIONS=4)
 add_cli_error_test(expansion_limit_error -D NOISE_MAX_EXPANSIONS=4)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)
+
+# ~2s on a current machine (unoptimized build)
+add_cli_perf_test(vars_load 20000)
