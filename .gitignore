@@ -2,3 +2,5 @@ src/TAGS
 build/*
 .cache/*
 .pytest_cache/*
+# Emacs undo-tree history files
+*.~undo-tree~
