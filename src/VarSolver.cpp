@@ -17,12 +17,6 @@ namespace {
 
 using Op = Expr::Op;
 
-// Max solver checks spent on probing a single variable's random value.
-constexpr int MAX_PROBES = 128;
-
-// Initial sampling range of a REAL variable (the solver has no natural one).
-constexpr double REAL_RANGE = 1e9;
-
 // A translated (sub)expression: either typed (a Z3 expr of a known VarType)
 // or untyped (a literal/name text, adopting the type of the operand it meets).
 struct Val {
@@ -46,8 +40,16 @@ string real_numeral(const string& text, double d) {
 
 class Resolver {
   public:
+    // Config params (see namespace config in Context.h) are read here, as
+    // seen from the scope the VARS block is resolved in.
     Resolver(ContextManager* cm, std::mt19937_64& gen)
-        : _solver(_ctx), _cm(cm), _gen(gen) {
+        : _solver(_ctx), _cm(cm), _gen(gen),
+          _max_probes(cm ? cm->config_int(config::MAX_PROBES,
+                                          config::MAX_PROBES_DEFAULT, 0)
+                         : config::MAX_PROBES_DEFAULT),
+          _real_range(cm ? cm->config_real(config::REAL_RANGE,
+                                           config::REAL_RANGE_DEFAULT, 0)
+                         : config::REAL_RANGE_DEFAULT) {
         z3::params p(_ctx);
         p.set("random_seed", static_cast<unsigned>(_gen() & 0xffffffffu));
         _solver.set(p);
@@ -102,6 +104,10 @@ class Resolver {
     z3::solver _solver;
     ContextManager* _cm;
     std::mt19937_64& _gen;
+    // max solver checks spent on probing a single variable's random value
+    const int64_t _max_probes;
+    // initial sampling range of a REAL variable (it has no natural one)
+    const double _real_range;
 
     std::vector<Var> _vars;
     std::map<string, size_t> _var_idx;
@@ -489,7 +495,7 @@ class Resolver {
     // For a single feasible interval this is a uniform pick from it.
     template <typename T, typename Mk, typename Ge, typename Dist>
     void bisect(const z3::expr& v, T lo, T hi, Mk mk, Ge ge, Dist dist) {
-        for (int i = 0; i < MAX_PROBES && lo <= hi; ++i) {
+        for (int64_t i = 0; i < _max_probes && lo <= hi; ++i) {
             T c = dist(lo, hi);
             z3::expr ce = mk(c);
             if (try_add(v == ce)) {
@@ -519,6 +525,9 @@ class Resolver {
     }
 
     void probe(const Var& v) {
+        if (_max_probes == 0) {
+            return;  // probing disabled: the solver's own model is taken
+        }
         const VarType& t = v.decl.type;
         switch (t.kind) {
         case VarKind::BOOL:
@@ -528,6 +537,9 @@ class Resolver {
             std::vector<int> idx(_strings.size());
             std::iota(idx.begin(), idx.end(), 0);
             std::shuffle(idx.begin(), idx.end(), _gen);
+            if (static_cast<int64_t>(idx.size()) > _max_probes) {
+                idx.resize(static_cast<size_t>(_max_probes));
+            }
             for (int i : idx) {
                 if (try_add(v.e == _ctx.int_val(i))) {
                     return;
@@ -558,7 +570,7 @@ class Resolver {
         }
         case VarKind::REAL:
             bisect<double>(
-                v.e, -REAL_RANGE, REAL_RANGE,
+                v.e, -_real_range, _real_range,
                 [&](double c) {
                     return _ctx.real_val(format("{:.17f}", c).c_str());
                 },

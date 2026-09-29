@@ -2,6 +2,9 @@
 
 #include <Context.h>
 #include <Exception.h>
+#include <Utils.h>
+#include <charconv>
+#include <cmath>
 #include <optional>
 
 namespace noise {
@@ -51,6 +54,39 @@ std::optional<const std::string> ContextManager::get(const std::string& name)
     if (!_mapper.contains(name))
         return std::nullopt;
     return _mapper.at(name);
+}
+
+int64_t ContextManager::config_int(const char* name, int64_t dflt, int64_t min)
+{
+    auto raw = get(name);
+    if (!raw) {
+        return dflt;
+    }
+    std::string v = trim(*raw);
+    int64_t out = 0;
+    auto [ptr, ec] = std::from_chars(v.data(), v.data() + v.size(), out);
+    if (v.empty() || ec != std::errc() || ptr != v.data() + v.size() || out < min) {
+        throw NoiseValueError(std::format(
+            "config param {}='{}' must be an integer >= {}", name, *raw, min));
+    }
+    return out;
+}
+
+double ContextManager::config_real(const char* name, double dflt, double min)
+{
+    auto raw = get(name);
+    if (!raw) {
+        return dflt;
+    }
+    std::string v = trim(*raw);
+    double out = 0;
+    auto [ptr, ec] = std::from_chars(v.data(), v.data() + v.size(), out);
+    if (v.empty() || ec != std::errc() || ptr != v.data() + v.size() ||
+        !std::isfinite(out) || out <= min) {
+        throw NoiseValueError(std::format(
+            "config param {}='{}' must be a number > {}", name, *raw, min));
+    }
+    return out;
 }
 
 } // namespace noise
