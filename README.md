@@ -68,8 +68,7 @@ to the template files that follow it.
 | `-I`, `--include-path <dir>[:<dir>...]` | search path for `INCLUDE`d def files |
 | `-D`, `--define <name>[=<value>]` | define a global param (see [Global params](#global-params)) |
 | `-s`, `--seed <n>` | random seed (default 0) |
-| `-o`, `--out-file <file>` | write the output there (default stdout) |
-| `-m`, `--mode file\|expr`, `-f`, `--file`, `-e`, `--expr` | whether non-option args are template files (default) or template text |
+| `-o`, `--out-file <file>` | write the output of the template files that follow there (default stdout); a later `-o` switches to another file |
 | `-l`, `--log-file <file>` | log file (default stderr) |
 | `--log-level <level>` | `fatal`, `error`, `warning`, `info`, `debug`, or a number 10-50 |
 

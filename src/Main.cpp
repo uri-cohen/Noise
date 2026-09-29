@@ -51,7 +51,6 @@ class NoiseCmd : public Cmd {
     int process_include_path(int idx);
     int process_seed(int idx);
     int process_define(int idx);
-    int process_mode(int idx);
     int process_log_level(int idx);
     int process_log_file(int idx);
 
@@ -65,8 +64,10 @@ class NoiseCmd : public Cmd {
 
   private:
     NoiseFlow _noise_flow;
+    // the -o file; kept open (and flushed on destruction) for the whole run
+    ofstream _out_file;
+    // &_out_file or &cout
     ostream* _out_p;
-    istream* _in_p;
     string _in_file_name;
 };
 
@@ -74,7 +75,6 @@ class NoiseCmd : public Cmd {
 
 NoiseCmd::NoiseCmd(int argc, char** argv)
     : Cmd(argc, argv, CB(process_in_file), NOISE_VERSION, NOISE_HELP_HEADER),
-      _in_p(nullptr),
       _out_p(&cout) {
     // clang-format off
     add<string>("out-file", 'o', string(""),
@@ -93,15 +93,6 @@ NoiseCmd::NoiseCmd(int argc, char** argv)
     add<long>("seed", 's', 0,
         "set seed (long int)",
         CB(process_seed));
-    add<string>("mode", 'm', "file",
-        "'file' or 'expr' - how to interpret non option args",
-        CB(process_mode));
-    add<bool>("file", 'f', true,
-        "args are files to be pre-processed",
-        CB(process_mode));
-    add<bool>("expr", 'e', false,
-        "args are string expressions to be pre-processed",
-        CB(process_mode));
     add<string>("log-file", 'l', "",
         "log file name",
         CB(process_log_file));
@@ -112,54 +103,45 @@ NoiseCmd::NoiseCmd(int argc, char** argv)
     // clang-format on
 }
 
+// A non option arg: a document template file, expanded right away (so the
+// options preceding it apply). An empty name reads the template from stdin.
 int NoiseCmd::process_in_file(int idx) {
-    string a(_argv[_current]);
-    optional<string> mode =
-        dynamic_cast<CmdOpt<string>*>(_arg2opt["mode"])->value();
+    _in_file_name = _argv[_current];
     _out_p = _out_p ? _out_p : &cout;
-    if (mode && *mode == "expr") {
-        return _noise_flow.expand(a, "<arg>", *_out_p);
-    }
-    _in_file_name = a;
-    if (_in_p && _in_p != &cin) {
-        dynamic_cast<ifstream*>(_in_p)->close();
-        delete _in_p;
-        _in_p = nullptr;
-    }
-
-    ifstream in_file;
-    if (!_in_file_name.empty()) {
-        in_file.open(path(_in_file_name));
-        _in_p = &in_file;
-    } else {
+    if (_in_file_name.empty()) {
         _in_file_name = "<stdin>";
-        _in_p = &cin;
+        INFO(403, "setting input file to {}", _in_file_name);
+        _noise_flow.expand(cin, _in_file_name, *_out_p);
+        return 1;
     }
-    if (!*_in_p) {
-        _in_p = nullptr;
+    ifstream in_file{path(_in_file_name)};
+    if (!in_file) {
         throw noise::NoiseIOError(format(
             "expand_file failed openning input file '{}'", _in_file_name));
     }
-
     INFO(403, "setting input file to {}", _in_file_name);
-    _noise_flow.expand(*_in_p, _in_file_name, *_out_p);
+    _noise_flow.expand(in_file, _in_file_name, *_out_p);
     return 1;
 }
 
+// -o: output of the template files that follow goes to this file (an
+// empty name: stdout); a later -o switches to another one.
 int NoiseCmd::process_out_file(int idx) {
     string out_file_name;
     int cap = check_arg("out-file", out_file_name);
     CmdOpt<string>* opt = dynamic_cast<CmdOpt<string>*>(_opts[idx]);
-    ofstream out_file;
-    ostream* _out_p = out_file_name.empty() ? &cout : &out_file;
-    if (!out_file_name.empty()) {
-        out_file.open(path(out_file_name));
+    if (_out_file.is_open()) {
+        _out_file.close();
     }
-    if (!*_out_p) {
-        _out_p = nullptr;
-        opt->clear_value();
-        throw noise::NoiseIOError(format(
-            "expand_file failed openning output file '{}'", out_file_name));
+    _out_p = &cout;
+    if (!out_file_name.empty()) {
+        _out_file.open(path(out_file_name));
+        if (!_out_file) {
+            opt->clear_value();
+            throw noise::NoiseIOError(format(
+                "expand_file failed openning output file '{}'", out_file_name));
+        }
+        _out_p = &_out_file;
     }
     opt->value(out_file_name);
     INFO(402, "setting output file to {}", out_file_name);
@@ -198,24 +180,6 @@ int NoiseCmd::process_define(int idx) {
     string value = eq == string::npos ? string("true") : def.substr(eq + 1);
     _noise_flow.define_param(name, value);
     INFO(408, "defining global param {}={}", name, value);
-    return cap;
-}
-
-int NoiseCmd::process_mode(int idx) {
-    string mode(_argv[_current]);
-    int cap = 1;
-    if (mode == "--mode" || mode == "-m") {
-        cap = check_arg("mode", mode);
-    } else if (_opts[idx]->name() == "file") {
-        mode = "file";
-    } else {
-        mode = "expr";
-    }
-
-    CmdOpt<string>* opt = dynamic_cast<CmdOpt<string>*>(_arg2opt["mode"]);
-    opt->value(mode);
-    INFO(404, "setting command line's non-opts interpretation mode to {}",
-         mode);
     return cap;
 }
 
