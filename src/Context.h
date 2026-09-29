@@ -26,6 +26,10 @@ inline constexpr double REAL_RANGE_DEFAULT = 1e9;
 // levels a default (8MB) stack holds
 inline constexpr const char* MAX_DEPTH = "NOISE_MAX_DEPTH";
 inline constexpr int64_t MAX_DEPTH_DEFAULT = 256;
+// max re-expansions of a macro's output (or a param's value) until it stops
+// changing (Expansion Flow step 7)
+inline constexpr const char* MAX_EXPANSIONS = "NOISE_MAX_EXPANSIONS";
+inline constexpr int64_t MAX_EXPANSIONS_DEFAULT = 64;
 }  // namespace config
 
 class Context {
