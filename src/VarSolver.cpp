@@ -1,5 +1,7 @@
 // Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 
+#include <functional>
+#include <limits>
 #include <numeric>
 #include <z3++.h>
 //
@@ -109,6 +111,8 @@ class Resolver {
     z3::solver _solver;
     // whether the last check was SAT, i.e. the solver holds a current model
     bool _model_valid = false;
+    // solver checks left for probing the current variable
+    int64_t _budget = 0;
     ContextManager* _cm;
     std::mt19937_64& _gen;
     // max solver checks spent on probing a single variable's random value
@@ -486,14 +490,27 @@ class Resolver {
 
     // -------------------------------------------------------------- probing
 
-    // Adds c to the solver if it keeps it satisfiable (the push is kept).
     z3::check_result check() {
         z3::check_result r = _solver.check();
         _model_valid = r == z3::sat;
         return r;
     }
 
+    // Spends one of the current variable's solver checks (NOISE_MAX_PROBES).
+    bool spend() {
+        if (_budget <= 0) {
+            return false;
+        }
+        --_budget;
+        return true;
+    }
+
+    // Adds c to the solver if it keeps it satisfiable (the push is kept).
+    // False also once the variable's check budget is spent.
     bool try_add(const z3::expr& c) {
+        if (!spend()) {
+            return false;
+        }
         _solver.push();
         _solver.add(c);
         if (check() == z3::sat) {
@@ -503,33 +520,132 @@ class Resolver {
         return false;
     }
 
+    // The operations sampling a numeric variable needs, per C++ value type.
+    template <typename T>
+    struct NumOps {
+        std::function<z3::expr(T)> mk;                                 // T -> numeral
+        std::function<z3::expr(const z3::expr&, const z3::expr&)> ge;  // a >= b
+        std::function<z3::expr(const z3::expr&, const z3::expr&)> le;  // a <= b
+        std::function<T(const z3::expr&)> get;                         // numeral -> T
+        std::function<T(T, T)> dist;                                   // uniform in [lo, hi]
+    };
+
+    // Checks c without keeping it: on SAT, value gets v's value in that
+    // solution. Leaves no model behind.
+    template <typename T>
+    bool test(const z3::expr& v, const z3::expr& c, const NumOps<T>& ops, T& value) {
+        _solver.push();
+        _solver.add(c);
+        bool sat = check() == z3::sat;
+        if (sat) {
+            value = ops.get(_solver.get_model().eval(v, true));
+        }
+        _solver.pop();
+        _model_valid = false;
+        return sat;
+    }
+
+    // From a known solution m, finds a bound of v's solutions in one
+    // direction (toward `bound`, the type's extreme) with growing steps:
+    // tests "v beyond m +/- d" (not kept), jumping to each solution it finds
+    // and doubling d, until there is none - a few checks for a narrow range,
+    // instead of halving all the way down from the type's extreme. The bound
+    // returned may be loose (bisect copes), but no solution lies beyond it.
+    template <typename T>
+    T gallop(const z3::expr& v, T m, T bound, bool up, const NumOps<T>& ops) {
+        T p = m;
+        T d = 1;
+        while (up ? p < bound : p > bound) {
+            if (!spend()) {
+                return bound;
+            }
+            T t = up ? (p > bound - d ? bound : p + d) : (p < bound + d ? bound : p - d);
+            T value{};
+            z3::expr beyond = up ? ops.ge(v, ops.mk(t)) : ops.le(v, ops.mk(t));
+            if (!test(v, beyond, ops, value)) {
+                if constexpr (std::is_integral_v<T>) {
+                    return up ? t - 1 : t + 1;
+                } else {
+                    return t;
+                }
+            }
+            p = up ? std::max(value, t) : std::min(value, t);
+            if constexpr (std::is_integral_v<T>) {
+                d = d > std::numeric_limits<T>::max() / 2 ? std::numeric_limits<T>::max()
+                                                          : d * 2;
+            } else {
+                d *= 2;
+            }
+        }
+        return bound;
+    }
+
     // Random-point bisection over [lo, hi]: try v == c for a uniform c; if
-    // that is infeasible keep the half (v >= c or v < c) holding solutions.
-    // For a single feasible interval this is a uniform pick from it.
-    template <typename T, typename Mk, typename Ge, typename Dist>
-    void bisect(const z3::expr& v, T lo, T hi, Mk mk, Ge ge, Dist dist) {
-        for (int64_t i = 0; i < _max_probes && lo <= hi; ++i) {
-            T c = dist(lo, hi);
-            z3::expr ce = mk(c);
+    // that is infeasible, go on in one of the halves beside c - a random one,
+    // weighted by the halves' sizes, is tried (and kept) first; if it holds
+    // no solution the other one is implied. For a single feasible interval
+    // this is a uniform pick from it; with gaps (e.g. "v % 7 == 0") the size
+    // weighting avoids drifting toward either end.
+    template <typename T>
+    void bisect(const z3::expr& v, T lo, T hi, const NumOps<T>& ops) {
+        while (_budget > 0 && lo <= hi) {
+            T c = ops.dist(lo, hi);
+            z3::expr ce = ops.mk(c);
             if (try_add(v == ce)) {
                 return;
             }
-            if (try_add(ge(v, ce))) {
-                if constexpr (std::is_integral_v<T>) {
-                    if (c == hi) return;
+            if constexpr (std::is_integral_v<T>) {
+                if (lo == hi) {
+                    return;  // lo..hi was just c
+                }
+                // the halves [lo, c-1] and [c+1, hi] (one possibly empty)
+                long double below = static_cast<long double>(c) - lo;
+                long double above = static_cast<long double>(hi) - c;
+                bool up = c == lo || (c != hi && std::uniform_real_distribution<long double>(
+                                                     0, below + above)(_gen) < above);
+                if (up ? try_add(ops.ge(v, ops.mk(c + 1))) : !try_add(ops.le(v, ops.mk(c - 1)))) {
                     lo = c + 1;
                 } else {
-                    lo = c;
+                    hi = c - 1;
                 }
             } else {
-                if constexpr (std::is_integral_v<T>) {
-                    if (c == lo) return;
-                    hi = c - 1;
+                // above c with probability (hi - c) / (hi - lo)
+                bool up = std::uniform_real_distribution<T>(lo, hi)(_gen) >= c;
+                if (up ? try_add(ops.ge(v, ce)) : !try_add(ops.le(v, ce))) {
+                    lo = c;
                 } else {
                     hi = c;
                 }
             }
         }
+    }
+
+    // Picks a random value of a numeric variable within [min, max] (the
+    // type's range; for REAL NOISE_REAL_RANGE, widened to hold a solution
+    // found beyond it).
+    template <typename T>
+    void sample(const z3::expr& v, T min, T max, const NumOps<T>& ops) {
+        std::optional<T> m;
+        if (_model_valid) {
+            m = ops.get(_solver.get_model().eval(v, true));
+        }
+        // 1. A wide (e.g. unconstrained) variable: a pick from the whole
+        //    range most likely fits as is.
+        if (try_add(v == ops.mk(ops.dist(min, max)))) {
+            return;
+        }
+        if (!m) {
+            if (!spend() || check() != z3::sat) {
+                return;
+            }
+            m = ops.get(_solver.get_model().eval(v, true));
+        }
+        min = std::min(min, *m);
+        max = std::max(max, *m);
+        // 2. Bracket the solutions around the known one, 3. pick among them.
+        T hi = gallop(v, *m, max, true, ops);
+        T lo = gallop(v, *m, min, false, ops);
+        bisect(v, lo, hi, ops);
     }
 
     template <typename T>
@@ -538,10 +654,15 @@ class Resolver {
     }
 
     void probe(const Var& v) {
-        if (_max_probes == 0) {
+        _budget = _max_probes;
+        if (_budget == 0) {
             return;  // probing disabled: the solver's own model is taken
         }
         const VarType& t = v.decl.type;
+        auto uge = [](const z3::expr& a, const z3::expr& b) { return z3::uge(a, b); };
+        auto ule = [](const z3::expr& a, const z3::expr& b) { return z3::ule(a, b); };
+        auto ge = [](const z3::expr& a, const z3::expr& b) { return a >= b; };
+        auto le = [](const z3::expr& a, const z3::expr& b) { return a <= b; };
         switch (t.kind) {
         case VarKind::BOOL:
             try_add(v.e == _ctx.bool_val((_gen() & 1) != 0));
@@ -550,49 +671,54 @@ class Resolver {
             std::vector<int> idx(_strings.size());
             std::iota(idx.begin(), idx.end(), 0);
             std::shuffle(idx.begin(), idx.end(), _gen);
-            if (static_cast<int64_t>(idx.size()) > _max_probes) {
-                idx.resize(static_cast<size_t>(_max_probes));
-            }
             for (int i : idx) {
-                if (try_add(v.e == _ctx.int_val(i))) {
+                if (_budget <= 0 || try_add(v.e == _ctx.int_val(i))) {
                     return;
                 }
             }
             return;
         }
-        case VarKind::INT:
-            bisect<int64_t>(
-                v.e, INT64_MIN, INT64_MAX,
-                [&](int64_t c) { return _ctx.bv_val(c, 64); },
-                [](const z3::expr& a, const z3::expr& b) { return a >= b; },
-                [&](int64_t lo, int64_t hi) { return uniform_int(lo, hi); });
+        case VarKind::INT: {
+            NumOps<int64_t> ops{
+                [&](int64_t c) { return _ctx.bv_val(c, 64); }, ge, le,
+                [](const z3::expr& e) { return static_cast<int64_t>(e.get_numeral_uint64()); },
+                [&](int64_t lo, int64_t hi) { return uniform_int(lo, hi); }};
+            sample<int64_t>(v.e, INT64_MIN, INT64_MAX, ops);
             return;
+        }
         case VarKind::UINT:
         case VarKind::BITVEC: {
             unsigned w = t.bv_width();
             if (w > 64) {
                 return;  // no probing - the model's value is taken as is
             }
-            uint64_t hi = w == 64 ? UINT64_MAX : ((uint64_t{1} << w) - 1);
-            bisect<uint64_t>(
-                v.e, 0, hi,
-                [&](uint64_t c) { return _ctx.bv_val(c, w); },
-                [](const z3::expr& a, const z3::expr& b) { return z3::uge(a, b); },
-                [&](uint64_t lo, uint64_t hi) { return uniform_int(lo, hi); });
+            NumOps<uint64_t> ops{
+                [&, w](uint64_t c) { return _ctx.bv_val(c, w); }, uge, ule,
+                [](const z3::expr& e) { return e.get_numeral_uint64(); },
+                [&](uint64_t lo, uint64_t hi) { return uniform_int(lo, hi); }};
+            sample<uint64_t>(v.e, 0, w == 64 ? UINT64_MAX : ((uint64_t{1} << w) - 1), ops);
             return;
         }
-        case VarKind::REAL:
-            bisect<double>(
-                v.e, -_real_range, _real_range,
-                [&](double c) {
-                    return _ctx.real_val(format("{:.17f}", c).c_str());
-                },
-                [](const z3::expr& a, const z3::expr& b) { return a >= b; },
+        case VarKind::REAL: {
+            NumOps<double> ops{
+                [&](double c) { return _ctx.real_val(format("{:.17f}", c).c_str()); },
+                ge, le, [](const z3::expr& e) { return real_of(e); },
                 [&](double lo, double hi) {
                     return std::uniform_real_distribution<double>(lo, hi)(_gen);
-                });
+                }};
+            sample<double>(v.e, -_real_range, _real_range, ops);
             return;
         }
+        }
+    }
+
+    // A REAL numeral (possibly an irrational algebraic number) as a double.
+    static double real_of(const z3::expr& val) {
+        string s = val.get_decimal_string(17);
+        if (!s.empty() && s.back() == '?') {
+            s.pop_back();
+        }
+        return parse_real(s).value_or(0);
     }
 
     // ------------------------------------------------------------ rendering
@@ -614,14 +740,8 @@ class Resolver {
             val.is_numeral(s);
             return s;
         }
-        case VarKind::REAL: {
-            string s = val.get_decimal_string(17);
-            if (!s.empty() && s.back() == '?') {
-                s.pop_back();
-            }
-            auto d = parse_real(s);
-            return d ? format("{}", *d) : s;
-        }
+        case VarKind::REAL:
+            return format("{}", real_of(val));
         case VarKind::STRING:
             return _strings.at(static_cast<size_t>(val.get_numeral_int()));
         }

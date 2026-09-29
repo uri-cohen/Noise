@@ -107,5 +107,5 @@ add_cli_test(expansion_limit -D NOISE_MAX_EXPANSIONS=4)
 add_cli_error_test(expansion_limit_error -D NOISE_MAX_EXPANSIONS=4)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)
 
-# ~2s on a current machine (unoptimized build)
-add_cli_perf_test(vars_load 20000)
+# ~0.6s on a current machine (unoptimized build)
+add_cli_perf_test(vars_load 6000)
