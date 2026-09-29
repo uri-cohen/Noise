@@ -103,7 +103,7 @@ void Cmd::run() {
             opt_name = opt_name.substr(0, v_pos);
         }
         if (!_arg2opt.contains(opt_name)) {
-            throw CmdError(format("unknown option '{}", _argv[i]));
+            throw CmdError(format("unknown option '{}'", _argv[i]));
         }
 
         CmdOptBase* opt = _arg2opt[opt_name];
