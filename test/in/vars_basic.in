@@ -1,0 +1,4 @@
+1. fixed by a constraint: pinned
+2. derived from it: twice
+3. from a previous global VARS: later
+4. in [10,20]: ranged

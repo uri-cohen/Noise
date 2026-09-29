@@ -1,0 +1,10 @@
+# global scope variables: a pinned value, a derived one and a free range
+VARS = {
+    INT pinned, twice;
+    UINT ranged;
+    ASSERT pinned * 3 == 21;
+    ASSERT twice == pinned * 2;
+    ASSERT ranged >= 10 AND ranged <= 20;
+};
+# a later global block sees the earlier globals as constants
+VARS = { INT later; ASSERT later == twice + 1; };

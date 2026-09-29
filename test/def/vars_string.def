@@ -1,0 +1,8 @@
+MACRO color = {
+    TEXT = "[c]";
+    VARS = { STRING c; ASSERT c != "red" AND c != "green"; ASSERT c == "blue" OR c == "red"; };
+};
+MACRO pick = {
+    TEXT = "[s/t]";
+    VARS = { STRING s, t; BOOL diff; ASSERT diff; ASSERT diff -> s != t; ASSERT s == "a" OR s == "b"; ASSERT t == "a" OR t == "b"; ASSERT s == "a"; };
+};

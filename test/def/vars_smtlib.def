@@ -1,0 +1,12 @@
+MACRO sm = {
+    TEXT = "[k j]";
+    VARS = {
+        UINT k;
+        INT j;
+        SMTLIB <<EOT
+(assert (= k #x000000000000002a))
+EOT
+;
+        SMTLIB "(assert (= j (bvneg ((_ zero_extend 32) #x00000005))))";
+    };
+};

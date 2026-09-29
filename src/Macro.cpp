@@ -3,6 +3,7 @@
 #include <NoiseFlow.h>
 #include <Binding.h>
 #include <Macro.h>
+#include <Vars.h>
 
 namespace noise {
 

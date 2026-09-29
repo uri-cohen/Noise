@@ -10,6 +10,7 @@ namespace noise {
 
 class Macro;
 class ContextManager;
+class VarBlock;
 
 class NoiseFlow {
   public:
@@ -34,12 +35,20 @@ class NoiseFlow {
 
     bool is_expandable(const std::string& id) const;
 
+    /// A top level (global scope) VARS clause. Resolved lazily, once, by
+    /// the first top level expand() - not at import time, as the seed may
+    /// only be set by a later command line option.
+    void add_global_vars(std::shared_ptr<const VarBlock> vars);
+    void resolve_globals();
+
   private:
     ContextManager* _context_manager;
     std::map<std::string,Macro*> _macros;
     std::mt19937_64 _gen;
     std::vector<std::filesystem::path> _include_dirs;
     std::set<std::filesystem::path> _importing;
+    std::vector<std::shared_ptr<const VarBlock>> _global_vars;
+    bool _globals_resolved = false;
 };
 
 }; // namespace noise

@@ -16,11 +16,13 @@ int NoiseFlow::expand(std::istream& in, const std::string& top, std::ostream& ou
 {
     std::string text((std::istreambuf_iterator<char>(in)),
                       std::istreambuf_iterator<char>());
+    resolve_globals();
     return stream_expand(text, top, out);
 }
 
 int NoiseFlow::expand(const std::string& str, const std::string& top, std::ostream& out)
 {
+    resolve_globals();
     return stream_expand(str, top, out);
 }
 

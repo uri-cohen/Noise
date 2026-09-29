@@ -35,6 +35,7 @@ typedef noise::DocLexerExtra DocLexerExtra;
 %code {
 #include <Exception.h>
 #include <Utils.h>
+#include <VarSolver.h>
 
 #define yylex doc_lex
 noise::DocParser::symbol_type yylex(yyscan_t yyscanner);
@@ -191,9 +192,23 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     ctx.add_map("#line", std::to_string(extra->out_line));
     ctx.add_map("#col", std::to_string(extra->out_col));
 
-    extra->owner->context_manager()->push(std::move(ctx));
-    std::string raw = macro->expand(extra->owner->context_manager());
-    extra->owner->context_manager()->pop();
+    noise::ContextManager* cm = extra->owner->context_manager();
+    cm->push(std::move(ctx));
+    // VARS are resolved right after the params (their constraints may refer
+    // to them) and are then visible to the body just like params.
+    bool has_vars = macro->vars() != nullptr;
+    if (has_vars) {
+        noise::Context vars_ctx;
+        for (const auto& [k, v] : noise::resolve_vars(*macro->vars(), cm, extra->owner->gen())) {
+            vars_ctx.add_map(k, v);
+        }
+        cm->push(std::move(vars_ctx));
+    }
+    std::string raw = macro->expand(cm);
+    if (has_vars) {
+        cm->pop();
+    }
+    cm->pop();
 
     return expand_until_stable(extra, raw, std::format("macro:{}", name));
 }

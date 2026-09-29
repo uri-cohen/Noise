@@ -9,6 +9,7 @@ namespace noise {
 class NoiseFlow;
 class ContextManager;
 class Binding;
+class VarBlock;
 
 class Macro {
   public:
@@ -33,6 +34,11 @@ class Macro {
 
     std::mt19937_64& gen();
 
+    /// The macro's VARS clause, resolved right after its params are bound
+    /// (see invoke_macro in DocParser.yy); nullptr if it has none.
+    const std::shared_ptr<const VarBlock>& vars() const { return _vars; }
+    void set_vars(std::shared_ptr<const VarBlock> vars) { _vars = vars; }
+
   private:
     NoiseFlow* _owner;
     std::string _name;
@@ -40,6 +46,7 @@ class Macro {
     std::vector<Binding> _args;
     bool _hasParams;
     bool _hasArgs;
+    std::shared_ptr<const VarBlock> _vars;
 };
 
 }; // namespace noise

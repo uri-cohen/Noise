@@ -8,6 +8,8 @@
 #include <Exception.h>
 #include <NumericMacro.h>
 #include <TextMacro.h>
+#include <VarSolver.h>
+#include <Vars.h>
 
 using std::format;
 
@@ -97,6 +99,29 @@ Macro* NoiseFlow::find_macro(const std::string& id) const
 bool NoiseFlow::is_expandable(const std::string& id) const
 {
     return _macros.contains(id);
+}
+
+void NoiseFlow::add_global_vars(std::shared_ptr<const VarBlock> vars)
+{
+    _global_vars.push_back(vars);
+}
+
+void NoiseFlow::resolve_globals()
+{
+    if (_globals_resolved) {
+        return;
+    }
+    _globals_resolved = true;
+    // Each block becomes a permanent base context (never popped), in order,
+    // so a later global block sees the earlier ones' variables as constants.
+    for (const auto& block : _global_vars) {
+        Context ctx;
+        for (const auto& [name, value] :
+             resolve_vars(*block, _context_manager, _gen)) {
+            ctx.add_map(name, value);
+        }
+        _context_manager->push(std::move(ctx));
+    }
 }
 
 } // namespace noise

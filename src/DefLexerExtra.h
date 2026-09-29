@@ -8,6 +8,7 @@
 #include <noise_std_include.h>
 
 #include <Binding.h>
+#include <Vars.h>
 #include <def_location.hh>
 
 typedef void* yyscan_t;
@@ -22,7 +23,9 @@ typedef void* yyscan_t;
     X(PARAM_LIST_STATE)  \
     X(ARG_LIST_STATE)    \
     X(DEF_VALUE_STATE)   \
-    X(INCLUDE_STATE)
+    X(INCLUDE_STATE)     \
+    X(VARS_STATE)        \
+    X(VAR_VALUE_STATE)
 
 #define X(S) void def_push_##S(yyscan_t s);
 PUSH_STATES;
@@ -53,6 +56,13 @@ struct DefLexerExtra {
     bool curr_text_set;
     std::vector<Binding> curr_params;
     std::vector<Binding> curr_args;
+    // the current macro's VARS (all its VARS clauses accumulate into it)
+    std::shared_ptr<VarBlock> curr_macro_vars;
+
+    // the VARS clause currently being parsed (global or curr_macro_vars),
+    // and the type of the declaration list being parsed within it
+    std::shared_ptr<VarBlock> curr_vars;
+    VarType curr_var_type;
 
     std::vector<Macro*> macro_list;
     location loc;
