@@ -39,6 +39,11 @@ class NoiseFlow {
     /// the first top level expand() - not at import time, as the seed may
     /// only be set by a later command line option.
     void add_global_vars(std::shared_ptr<const VarBlock> vars);
+
+    /// A global param (e.g. from the command line's --define): name -> value,
+    /// visible to every scope below it (the document, macro bodies, VARS
+    /// constraints). A later definition of the same name shadows it.
+    void define_param(const std::string& name, const std::string& value);
     void resolve_globals();
 
   private:

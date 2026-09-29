@@ -21,11 +21,15 @@
 # SWIG/Python bindings: run the noise binary against a def/doc pair and
 # diff its output against the recorded .ex file.
 
+# Any further args are extra noise command line args (passed before --def).
+# They are '|'-joined here since a ';' list would be split by add_test.
 function(add_cli_test test_name)
+    string(JOIN "|" extra_args ${ARGN})
     add_test(
         NAME cli_${test_name}
         COMMAND ${CMAKE_COMMAND}
             -DNOISE_EXE=$<TARGET_FILE:noise>
+            "-DEXTRA_ARGS=${extra_args}"
             -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
             -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
             -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
@@ -53,3 +57,4 @@ add_cli_test(vars_macro)
 add_cli_test(vars_string)
 add_cli_test(vars_fallback)
 add_cli_test(vars_smtlib)
+add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)

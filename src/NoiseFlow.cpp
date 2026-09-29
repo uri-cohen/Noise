@@ -106,6 +106,18 @@ void NoiseFlow::add_global_vars(std::shared_ptr<const VarBlock> vars)
     _global_vars.push_back(vars);
 }
 
+void NoiseFlow::define_param(const std::string& name, const std::string& value)
+{
+    static const std::regex ID_RE("[a-zA-Z][a-zA-Z0-9_]*");
+    if (!std::regex_match(name, ID_RE)) {
+        throw NoiseValueError(
+            format("invalid global param name '{}' (expected an identifier)", name));
+    }
+    Context ctx;
+    ctx.add_map(name, value);
+    _context_manager->push(std::move(ctx));
+}
+
 void NoiseFlow::resolve_globals()
 {
     if (_globals_resolved) {

@@ -1,9 +1,12 @@
 # Runs the noise binary against a def/doc pair and diffs its stdout against
 # the recorded .ex file. Invoked by ctest via CMakeLists.txt's
-# add_cli_test(); expects NOISE_EXE, DEF_FILE, IN_FILE, EXPECTED_FILE.
+# add_cli_test(); expects NOISE_EXE, DEF_FILE, IN_FILE, EXPECTED_FILE and
+# (optionally) EXTRA_ARGS - '|'-separated noise args passed before --def.
+
+string(REPLACE "|" ";" extra_args "${EXTRA_ARGS}")
 
 execute_process(
-    COMMAND ${NOISE_EXE} --def ${DEF_FILE} ${IN_FILE}
+    COMMAND ${NOISE_EXE} ${extra_args} --def ${DEF_FILE} ${IN_FILE}
     OUTPUT_VARIABLE actual_output
     RESULT_VARIABLE noise_result
 )
