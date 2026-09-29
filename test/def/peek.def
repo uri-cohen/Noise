@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # a macro name directly followed by other characters (the lexer "peek" step),
 # at document level and inside param/arg lists
 macro m1 = { text = "M"; };

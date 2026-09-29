@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # a macro expanding itself fails at NOISE_MAX_DEPTH instead of overflowing
 # the stack
 MACRO again = { TEXT = "and again"; };

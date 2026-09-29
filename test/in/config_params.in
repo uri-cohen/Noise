@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. global real range of 0.001: tiny
 2. max probes 0, the solver model is taken as is: solved solved solved
 3. per call override back to sampling: solved<NOISE_MAX_PROBES=128> solved<NOISE_MAX_PROBES=128>

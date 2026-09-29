@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. default is unsorted (selection order): beta alpha
 2. sorted=true restores original text order: beta gamma
 3. a bare sorted flag means sorted=true: beta delta

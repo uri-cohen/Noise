@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # unsatisfiable: every variable of the block takes its fallback value
 MACRO fb = {
     TEXT = "[a b c d]";

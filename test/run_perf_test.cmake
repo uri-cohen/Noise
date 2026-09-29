@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # Runs the noise binary against a def/doc pair (as run_cli_test.cmake, but
 # its randomized output isn't diffed) and fails if it takes longer than its
 # time budget. Invoked by ctest via CMakeLists.txt's add_cli_perf_test();

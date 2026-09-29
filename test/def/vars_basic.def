@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # global scope variables: a pinned value, a derived one and a free range
 VARS = {
     INT pinned, twice;

@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. default (trim is automatic): got=[hi]
 2. quoted (trim no-op, no surrounding ws): got=[hi]
 3. keep_left_ws keeps the left side only: got=[   hi]

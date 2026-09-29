@@ -1,3 +1,4 @@
+arc/TAGS
 build/*
 .cache/*
 .pytest_cache/*

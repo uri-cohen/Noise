@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. default a=0,b=1,fmt=(empty) gives a raw real number: uniform_dist
 2. positional a,b with a 2-decimal fmt: uniform_dist<10, 20, fmt=.2f>
 3. named a=b collapses to a fixed value: uniform_dist<a=7,b=7,fmt=.0f>

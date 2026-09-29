@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 MACRO color = {
     TEXT = "[c]";
     VARS = { STRING c; ASSERT c != "red" AND c != "green"; ASSERT c == "blue" OR c == "red"; };

@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # pytest/SWIG-based tests are not runnable yet: SWIG bindings (noise_api_py)
 # are commented out in src/CMakeLists.txt, so there is no noise_api module
 # for these to import. Left here for when that lands.

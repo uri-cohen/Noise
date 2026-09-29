@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # performance workload (see add_cli_perf_test in CMakeLists.txt): a mix of
 # VARS resolutions of every variable type, invoked 20 times (see in/vars_load.in)
 VARS = { UINT scale; ASSERT scale >= 1 AND scale <= 1000; };

@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # constraints may refer to the macro's own params and to outer variables;
 # an inner VARS declaration shadows an outer variable of the same name
 MACRO below = {

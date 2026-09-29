@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # find_package(SWIG 4.4.0 REQUIRED)
 # find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(BISON REQUIRED)

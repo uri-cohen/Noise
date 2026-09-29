@@ -1,3 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # config params (NOISE_*): set globally on the command line (see
 # CMakeLists.txt: -D NOISE_REAL_RANGE=0.001) and overridden per scope
 VARS = { REAL tiny; };

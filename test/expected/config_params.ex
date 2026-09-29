@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. global real range of 0.001: 0.00098429041925966
 2. max probes 0, the solver model is taken as is: [13] [13] [13]
 3. per call override back to sampling: [14] [14]
