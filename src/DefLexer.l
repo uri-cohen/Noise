@@ -42,10 +42,12 @@ using std::string;
 %x ARG_LIST_STATE
 %x DEF_VALUE_STATE
 %x INCLUDE_STATE
+%x VARS_STATE
+%x VAR_VALUE_STATE
 
 %%
 
-<INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE,DEF_VALUE_STATE,INCLUDE_STATE>{
+<INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE,DEF_VALUE_STATE,INCLUDE_STATE,VARS_STATE,VAR_VALUE_STATE>{
 [ \t]+		{ yyextra->loc.step(); }
 \n		    { yyextra->loc.lines(1); yyextra->loc.step(); }
 }
@@ -55,6 +57,8 @@ using std::string;
 <PARAM_LIST_STATE>#.*   {}
 <ARG_LIST_STATE>#.*     {}
 <DEF_VALUE_STATE>#.*    {}
+<VARS_STATE>#.*         {}
+<VAR_VALUE_STATE>#.*    {}
 
 <INITIAL>MACRO  {
     return noise::DefParser::make_MACRO(yyextra->loc);
@@ -70,6 +74,9 @@ using std::string;
 }
 <INITIAL>ARGS  {
     return noise::DefParser::make_ARGS(yyextra->loc);
+}
+<INITIAL>VARS  {
+    return noise::DefParser::make_VARS(yyextra->loc);
 }
 
     /* string states are verbatim: each token is one line including its '\n' */
@@ -115,6 +122,42 @@ bool     { return noise::DefParser::make_BOOL(yyextra->loc); }
   * value. Only reached once '=' is actually shifted (see param_list/
   * arg_list in DefParser.yy). */
 <DEF_VALUE_STATE>[^;#'\"\n]+ {
+    return noise::DefParser::make_BARE_STRING(noise::trim(string(yytext)), yyextra->loc);
+}
+
+  /* A VARS clause: declarations, ASSERT constraint expressions and SMTLIB
+   * code. Type names and operator keywords are reserved in here. */
+<VARS_STATE>{
+bool     { return noise::DefParser::make_BOOL(yyextra->loc); }
+int      { return noise::DefParser::make_INT_T(yyextra->loc); }
+uint     { return noise::DefParser::make_UINT_T(yyextra->loc); }
+real     { return noise::DefParser::make_REAL_T(yyextra->loc); }
+bitvec   { return noise::DefParser::make_BITVEC_T(yyextra->loc); }
+string   { return noise::DefParser::make_STRING_T(yyextra->loc); }
+assert   { return noise::DefParser::make_ASSERT(yyextra->loc); }
+smtlib   { return noise::DefParser::make_SMTLIB(yyextra->loc); }
+and      { return noise::DefParser::make_AND(yyextra->loc); }
+or       { return noise::DefParser::make_OR(yyextra->loc); }
+xor      { return noise::DefParser::make_XOR(yyextra->loc); }
+not      { return noise::DefParser::make_NOT(yyextra->loc); }
+"<<"     { return noise::DefParser::make_LEFT_SHIFT(yyextra->loc); }
+">>"     { return noise::DefParser::make_SHR(yyextra->loc); }
+"<="     { return noise::DefParser::make_LE(yyextra->loc); }
+">="     { return noise::DefParser::make_GE(yyextra->loc); }
+"=="     { return noise::DefParser::make_EQ(yyextra->loc); }
+"!="     { return noise::DefParser::make_NE(yyextra->loc); }
+"->"     { return noise::DefParser::make_IMPLIES(yyextra->loc); }
+true|false|0x[0-9a-f]+|[0-9]+(\.[0-9]+)?(e[-+]?[0-9]+)? {
+    return noise::DefParser::make_LITERAL(yytext, yyextra->loc);
+}
+[[:alpha:]_][[:alnum:]_]* {
+    return noise::DefParser::make_ID(yytext, yyextra->loc);
+}
+}
+
+ /* A variable's fallback value - as DEF_VALUE_STATE, but a ',' also ends it
+  * (it may be followed by a further declaration of the same type). */
+<VAR_VALUE_STATE>[^;,#'\"\n]+ {
     return noise::DefParser::make_BARE_STRING(noise::trim(string(yytext)), yyextra->loc);
 }
 

@@ -8,13 +8,15 @@
 #include <Exception.h>
 #include <NumericMacro.h>
 #include <TextMacro.h>
+#include <VarSolver.h>
+#include <Vars.h>
 
 using std::format;
 
 namespace noise {
 
 NoiseFlow::NoiseFlow(uint64_t seed)
-    : _context_manager(new ContextManager()), _gen(seed) {
+    : _context_manager(new ContextManager()), _var_solver(new VarSolver()), _gen(seed) {
     add_macro(new UniformDistMacro(this));
     add_macro(new ExponentialDistMacro(this));
     add_macro(new NormalDistMacro(this));
@@ -27,6 +29,7 @@ NoiseFlow::NoiseFlow(uint64_t seed)
 
 NoiseFlow::~NoiseFlow() {
     delete _context_manager;
+    delete _var_solver;
     for (auto& [name, macro] : _macros) {
         delete macro;
     }
@@ -97,6 +100,41 @@ Macro* NoiseFlow::find_macro(const std::string& id) const
 bool NoiseFlow::is_expandable(const std::string& id) const
 {
     return _macros.contains(id);
+}
+
+void NoiseFlow::add_global_vars(std::shared_ptr<const VarBlock> vars)
+{
+    _global_vars.push_back(vars);
+}
+
+void NoiseFlow::define_param(const std::string& name, const std::string& value)
+{
+    static const std::regex ID_RE("[a-zA-Z][a-zA-Z0-9_]*");
+    if (!std::regex_match(name, ID_RE)) {
+        throw NoiseValueError(
+            format("invalid global param name '{}' (expected an identifier)", name));
+    }
+    Context ctx;
+    ctx.add_map(name, value);
+    _context_manager->push(std::move(ctx));
+}
+
+void NoiseFlow::resolve_globals()
+{
+    if (_globals_resolved) {
+        return;
+    }
+    _globals_resolved = true;
+    // Each block becomes a permanent base context (never popped), in order,
+    // so a later global block sees the earlier ones' variables as constants.
+    for (const auto& block : _global_vars) {
+        Context ctx;
+        for (const auto& [name, value] :
+             _var_solver->resolve(*block, _context_manager, _gen)) {
+            ctx.add_map(name, value);
+        }
+        _context_manager->push(std::move(ctx));
+    }
 }
 
 } // namespace noise

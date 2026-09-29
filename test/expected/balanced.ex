@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. literal parens, not a macro call: got=[f(a,b)]
 2. literal angles, not a macro call: got=[f<a,b>]
 3. nested literal groups: got=[f(a,g(b,c),d)]

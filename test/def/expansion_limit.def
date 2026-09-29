@@ -1,0 +1,9 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# each re-expansion strips one level of '\' escapes: layered needs 5 rounds
+# (4 changing, 1 confirming) - above the global NOISE_MAX_EXPANSIONS=4 (see
+# CMakeLists.txt), so it is only stable when the limit is raised per scope
+MACRO layered = { TEXT = "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\x"; };
+MACRO roomy = {
+    TEXT = "layered";
+    PARAMS = { NOISE_MAX_EXPANSIONS = 5; };
+};

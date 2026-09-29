@@ -1,0 +1,18 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# config params (NOISE_*): set globally on the command line (see
+# CMakeLists.txt: -D NOISE_REAL_RANGE=0.001) and overridden per scope
+VARS = { REAL tiny; };
+MACRO solved = {
+    TEXT = "[v]";
+    PARAMS = { NOISE_MAX_PROBES = 0; };
+    VARS = { UINT v; ASSERT v >= 10 AND v <= 20; };
+};
+MACRO sampled = {
+    TEXT = "[v]";
+    VARS = { UINT v; ASSERT v >= 10 AND v <= 20; };
+};
+MACRO wide = {
+    TEXT = "[w]";
+    PARAMS = { NOISE_REAL_RANGE = 1e6; };
+    VARS = { REAL w; ASSERT w > 1000; };
+};

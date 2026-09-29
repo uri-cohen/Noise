@@ -10,6 +10,28 @@
 
 namespace noise {
 
+/// Configuration params: ordinary (global or per scope) params with a
+/// reserved "NOISE_" prefix, read by the flow itself to tune its behavior.
+/// Being params, they can be set globally (-D on the command line) and
+/// overridden in any inner scope (e.g. a macro's PARAMS).
+namespace config {
+// VARS solver: max solver checks spent probing one variable's random value
+// (0 disables probing - the solver's own model is taken as is)
+inline constexpr const char* MAX_PROBES = "NOISE_MAX_PROBES";
+inline constexpr int64_t MAX_PROBES_DEFAULT = 128;
+// VARS solver: a REAL variable is sampled within [-range, range]
+inline constexpr const char* REAL_RANGE = "NOISE_REAL_RANGE";
+inline constexpr double REAL_RANGE_DEFAULT = 1e9;
+// macro expansion nesting (recursion) limit - far below the few thousands
+// levels a default (8MB) stack holds
+inline constexpr const char* MAX_DEPTH = "NOISE_MAX_DEPTH";
+inline constexpr int64_t MAX_DEPTH_DEFAULT = 256;
+// max re-expansions of a macro's output (or a param's value) until it stops
+// changing (Expansion Flow step 7)
+inline constexpr const char* MAX_EXPANSIONS = "NOISE_MAX_EXPANSIONS";
+inline constexpr int64_t MAX_EXPANSIONS_DEFAULT = 64;
+}  // namespace config
+
 class Context {
   public:
     Context(std::istream* in_stream = nullptr,
@@ -66,6 +88,12 @@ class ContextManager {
     Context& top();
 
     std::optional<const std::string> get(const std::string& name);
+
+    /// A configuration param's current value (see namespace config), or
+    /// dflt if not set. Throws NoiseValueError if it is set to a value that
+    /// is not a number, or is below min (for a real: not above min).
+    int64_t config_int(const char* name, int64_t dflt, int64_t min);
+    double config_real(const char* name, double dflt, double min);
 
   private:
     std::map<std::string, std::string> _mapper;

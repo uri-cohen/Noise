@@ -1,7 +1,13 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # find_package(SWIG 4.4.0 REQUIRED)
 # find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 find_package(BISON REQUIRED)
 find_package(FLEX  REQUIRED)
+
+# Z3 (VARS constraint solving). The Ubuntu libz3-dev package ships no CMake
+# config, so it is located directly.
+find_path(Z3_INCLUDE_DIR z3++.h REQUIRED)
+find_library(Z3_LIBRARY z3 REQUIRED)
 
 # include(UseSWIG)
 
@@ -75,6 +81,10 @@ add_library(noise_core SHARED
     TextMacro.cpp
     TextMacro.h
     Utils.h
+    VarSolver.cpp
+    VarSolver.h
+    Vars.cpp
+    Vars.h
     noise_std_include.h
 
     # Generated sources:
@@ -104,7 +114,10 @@ target_include_directories(noise_core PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_BINARY_DIR}/src
+    ${Z3_INCLUDE_DIR}
  )
+
+target_link_libraries(noise_core PRIVATE ${Z3_LIBRARY})
 
 # ── executable ─────────────────────────────────────────────────────────────────
 

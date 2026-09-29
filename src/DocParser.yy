@@ -1,3 +1,4 @@
+/* Copyrights Uri Cohen uri.l.cohen@gmail.com 2026 */
 /* clang-format off */
 
 %code requires {
@@ -35,6 +36,7 @@ typedef noise::DocLexerExtra DocLexerExtra;
 %code {
 #include <Exception.h>
 #include <Utils.h>
+#include <VarSolver.h>
 
 #define yylex doc_lex
 noise::DocParser::symbol_type yylex(yyscan_t yyscanner);
@@ -153,15 +155,16 @@ static void bind_list(const std::string& macro_name,
 }
 
 // Expansion Flow steps 7-8: re-expands `raw` as a fresh document, repeating
-// until the output stops changing, or throws if it never stabilizes. Used
-// both for a macro's own body (post step 6) and, for params, right after
-// balanced_text captures their raw value (step 4).
+// until the output stops changing, or throws if it doesn't within
+// max_expansions (NOISE_MAX_EXPANSIONS) rounds. Used both for a macro's own
+// body (post step 6) and, for params, right after balanced_text captures
+// their raw value (step 4).
 static std::string expand_until_stable(noise::DocLexerExtra* extra,
                                         const std::string& raw,
-                                        const std::string& stream_id) {
+                                        const std::string& stream_id,
+                                        int64_t max_expansions) {
     std::string prev = raw, curr;
-    int iterations = 0;
-    constexpr int MAX_ITERATIONS = 64;
+    int64_t iterations = 0;
     do {
         std::ostringstream tmp;
         extra->owner->stream_expand(prev, stream_id, tmp);
@@ -170,13 +173,21 @@ static std::string expand_until_stable(noise::DocLexerExtra* extra,
             break;
         }
         prev = curr;
-    } while (++iterations < MAX_ITERATIONS);
-    if (iterations >= MAX_ITERATIONS) {
+    } while (++iterations < max_expansions);
+    if (iterations >= max_expansions) {
         throw noise::NoiseMacroCallError(std::format(
-            "possible infinite expansion while expanding '{}'", stream_id));
+            "possible infinite expansion while expanding '{}' - not stable "
+            "after NOISE_MAX_EXPANSIONS={} re-expansions", stream_id, max_expansions));
     }
     return prev;
 }
+
+// Counts one macro expansion nesting level for the guard's lifetime.
+struct DepthGuard {
+    explicit DepthGuard(int64_t& depth) : _depth(depth) { ++_depth; }
+    ~DepthGuard() { --_depth; }
+    int64_t& _depth;
+};
 
 static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& name,
                                  std::vector<noise::Binding> params,
@@ -191,11 +202,37 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     ctx.add_map("#line", std::to_string(extra->out_line));
     ctx.add_map("#col", std::to_string(extra->out_col));
 
-    extra->owner->context_manager()->push(std::move(ctx));
-    std::string raw = macro->expand(extra->owner->context_manager());
-    extra->owner->context_manager()->pop();
+    noise::ContextManager* cm = extra->owner->context_manager();
+    cm->push(std::move(ctx));
+    // Read once the call's own params are bound, so a call site param
+    // (m<NOISE_MAX_DEPTH=...>) already applies to this very call.
+    int64_t max_depth = cm->config_int(noise::config::MAX_DEPTH,
+                                       noise::config::MAX_DEPTH_DEFAULT, 1);
+    int64_t max_expansions = cm->config_int(noise::config::MAX_EXPANSIONS,
+                                            noise::config::MAX_EXPANSIONS_DEFAULT, 1);
+    if (extra->owner->depth() >= max_depth) {
+        throw noise::NoiseMacroCallError(std::format(
+            "macro '{}' exceeds the expansion nesting depth limit "
+            "NOISE_MAX_DEPTH={} (a macro expanding itself?)", name, max_depth));
+    }
+    DepthGuard depth_guard(extra->owner->depth());
+    // VARS are resolved right after the params (their constraints may refer
+    // to them) and are then visible to the body just like params.
+    bool has_vars = macro->vars() != nullptr;
+    if (has_vars) {
+        noise::Context vars_ctx;
+        for (const auto& [k, v] : extra->owner->var_solver()->resolve(*macro->vars(), cm, extra->owner->gen())) {
+            vars_ctx.add_map(k, v);
+        }
+        cm->push(std::move(vars_ctx));
+    }
+    std::string raw = macro->expand(cm);
+    if (has_vars) {
+        cm->pop();
+    }
+    cm->pop();
 
-    return expand_until_stable(extra, raw, std::format("macro:{}", name));
+    return expand_until_stable(extra, raw, std::format("macro:{}", name), max_expansions);
 }
 
 }
@@ -322,7 +359,9 @@ arg_list:
  * passing a bare word as a positional value. */
 param:
     opt_attrs opt_id_eq balanced_text {
-        $$ = noise::Binding($2, expand_until_stable(extra, $3, "param"), $1);
+        int64_t max_expansions = extra->owner->context_manager()->config_int(
+            noise::config::MAX_EXPANSIONS, noise::config::MAX_EXPANSIONS_DEFAULT, 1);
+        $$ = noise::Binding($2, expand_until_stable(extra, $3, "param", max_expansions), $1);
     }
     | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;

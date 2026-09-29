@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. double backslash is a literal backslash: a\\b
 2. a single backslash escapes the next char and is consumed: a\xb
 3. escaping the first letter of a macro name prints it literally: \show

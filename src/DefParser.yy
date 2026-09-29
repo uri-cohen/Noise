@@ -1,3 +1,4 @@
+/* Copyrights Uri Cohen uri.l.cohen@gmail.com 2026 */
 /* clang-format off */
 
 %code requires {
@@ -6,6 +7,7 @@
 #include <TextMacro.h>
 #include <Binding.h>
 #include <Logger.h>
+#include <Vars.h>
 
 #include <DefParser.tab.hh>
 #include <DefLexerExtra.h>
@@ -53,6 +55,7 @@ void begin_macro(noise::DefLexerExtra* extra, const std::string& name) {
     extra->curr_text_set = false;
     extra->curr_params.clear();
     extra->curr_args.clear();
+    extra->curr_macro_vars.reset();
 }
 
 void end_macro(noise::DefLexerExtra* extra) {
@@ -67,7 +70,12 @@ void end_macro(noise::DefLexerExtra* extra) {
     for (auto& a : extra->curr_args) {
         m->add_arg(a);
     }
+    m->set_vars(extra->curr_macro_vars);
     extra->macro_list.push_back(m);
+}
+
+static noise::ExprPtr binary(noise::Expr::Op op, noise::ExprPtr a, noise::ExprPtr b) {
+    return noise::Expr::binary(op, a, b);
 }
 
 void finalize(noise::DefLexerExtra* extra) {
@@ -102,6 +110,40 @@ void finalize(noise::DefLexerExtra* extra) {
 %token KEEP_ENCLOSING_WS
 %token QUOTED
 %token BOOL
+%token VARS
+%token INT_T
+%token UINT_T
+%token REAL_T
+%token BITVEC_T
+%token STRING_T
+%token ASSERT
+%token SMTLIB
+%token AND
+%token OR
+%token XOR
+%token NOT
+%token SHR
+%token LE
+%token GE
+%token EQ
+%token NE
+%token IMPLIES
+%token <std::string> LITERAL
+
+/* constraint expression operators, lowest precedence first */
+%right IMPLIES
+%left OR
+%left XOR
+%left AND
+%left '|'
+%left '^'
+%left '&'
+%left EQ NE
+%left '<' '>' LE GE
+%left LEFT_SHIFT SHR
+%left '+' '-'
+%left '*' '/' '%'
+%precedence UNARY
 
 %nterm def_file
 %nterm defs
@@ -117,6 +159,11 @@ void finalize(noise::DefLexerExtra* extra) {
 %nterm param_list
 %nterm arg_list
 %nterm <noise::BindingAttr> attrs
+%nterm var_items
+%nterm var_decl_list
+%nterm var_decl
+%nterm <noise::VarType> var_type
+%nterm <noise::ExprPtr> expr
 
 %start def_file
 
@@ -128,6 +175,7 @@ defs:
     %empty
     | defs include
     | defs macro
+    | defs global_vars
     | defs error
     ;
 
@@ -149,6 +197,18 @@ macro:
       }
     ;
 
+/* A top level VARS clause: global document scope variables. */
+global_vars:
+    VARS '=' {
+          def_push_VARS_STATE(yyscanner);
+          extra->curr_vars = std::make_shared<noise::VarBlock>();
+      } '{' var_items '}' ';' {
+          def_pop_state(yyscanner);
+          extra->owner->add_global_vars(extra->curr_vars);
+          extra->curr_vars.reset();
+      }
+    ;
+
 macro_body:
     %empty
     | macro_body TEXT '=' quoted_string ';' {
@@ -165,6 +225,99 @@ macro_body:
       } '{' arg_list '}' ';' {
           def_pop_state(yyscanner);
       }
+    | macro_body VARS '=' {
+          def_push_VARS_STATE(yyscanner);
+          if (!extra->curr_macro_vars) {
+              extra->curr_macro_vars = std::make_shared<noise::VarBlock>();
+          }
+          extra->curr_vars = extra->curr_macro_vars;
+      } '{' var_items '}' ';' {
+          def_pop_state(yyscanner);
+          extra->curr_vars.reset();
+      }
+    ;
+
+var_items:
+    %empty
+    | var_items var_type {
+          extra->curr_var_type = $2;
+      } var_decl_list ';'
+    | var_items ASSERT expr ';' {
+          extra->curr_vars->add_assert($3);
+      }
+    | var_items SMTLIB quoted_string ';' {
+          extra->curr_vars->add_smtlib($3);
+      }
+    ;
+
+var_decl_list:
+    var_decl
+    | var_decl_list ',' var_decl
+    ;
+
+var_decl:
+    ID {
+          extra->curr_vars->add_decl($1, extra->curr_var_type, std::nullopt);
+      }
+    | ID '=' {
+          def_push_VAR_VALUE_STATE(yyscanner);
+      } value {
+          def_pop_state(yyscanner);
+          extra->curr_vars->add_decl($1, extra->curr_var_type, $4);
+      }
+    ;
+
+var_type:
+    BOOL       { $$ = noise::VarType{noise::VarKind::BOOL}; }
+    | INT_T    { $$ = noise::VarType{noise::VarKind::INT}; }
+    | UINT_T   { $$ = noise::VarType{noise::VarKind::UINT}; }
+    | REAL_T   { $$ = noise::VarType{noise::VarKind::REAL}; }
+    | STRING_T { $$ = noise::VarType{noise::VarKind::STRING}; }
+    | BITVEC_T '[' LITERAL ']' {
+          auto w = noise::parse_uint64($3);
+          if (!w || *w == 0 || *w > 65536) {
+              throw noise::NoiseDefBuilderError(
+                  std::format("invalid BITVEC width '{}'", $3));
+          }
+          $$ = noise::VarType{noise::VarKind::BITVEC, static_cast<unsigned>(*w)};
+      }
+    ;
+
+/* An identifier declared earlier in the same VARS clause is a variable;
+ * any other is a name, resolved at solve time (see VarSolver.h). */
+expr:
+    LITERAL { $$ = noise::Expr::leaf(noise::Expr::Op::LITERAL, $1); }
+    | quoted_string { $$ = noise::Expr::leaf(noise::Expr::Op::LITERAL, $1); }
+    | ID {
+          $$ = noise::Expr::leaf(extra->curr_vars->declared($1)
+                                     ? noise::Expr::Op::VAR
+                                     : noise::Expr::Op::NAME, $1);
+      }
+    | '(' expr ')' { $$ = $2; }
+    | '(' var_type ')' expr %prec UNARY { $$ = noise::Expr::cast($2, $4); }
+    | '-' expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::NEG, $2); }
+    | '~' expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::BITNOT, $2); }
+    | NOT expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::NOT, $2); }
+    | expr '*' expr        { $$ = binary(noise::Expr::Op::MUL, $1, $3); }
+    | expr '/' expr        { $$ = binary(noise::Expr::Op::DIV, $1, $3); }
+    | expr '%' expr        { $$ = binary(noise::Expr::Op::MOD, $1, $3); }
+    | expr '+' expr        { $$ = binary(noise::Expr::Op::ADD, $1, $3); }
+    | expr '-' expr        { $$ = binary(noise::Expr::Op::SUB, $1, $3); }
+    | expr LEFT_SHIFT expr { $$ = binary(noise::Expr::Op::SHL, $1, $3); }
+    | expr SHR expr        { $$ = binary(noise::Expr::Op::SHR, $1, $3); }
+    | expr '<' expr        { $$ = binary(noise::Expr::Op::LT, $1, $3); }
+    | expr LE expr         { $$ = binary(noise::Expr::Op::LE, $1, $3); }
+    | expr '>' expr        { $$ = binary(noise::Expr::Op::GT, $1, $3); }
+    | expr GE expr         { $$ = binary(noise::Expr::Op::GE, $1, $3); }
+    | expr EQ expr         { $$ = binary(noise::Expr::Op::EQ, $1, $3); }
+    | expr NE expr         { $$ = binary(noise::Expr::Op::NE, $1, $3); }
+    | expr '&' expr        { $$ = binary(noise::Expr::Op::BITAND, $1, $3); }
+    | expr '^' expr        { $$ = binary(noise::Expr::Op::BITXOR, $1, $3); }
+    | expr '|' expr        { $$ = binary(noise::Expr::Op::BITOR, $1, $3); }
+    | expr AND expr        { $$ = binary(noise::Expr::Op::AND, $1, $3); }
+    | expr XOR expr        { $$ = binary(noise::Expr::Op::XOR, $1, $3); }
+    | expr OR expr         { $$ = binary(noise::Expr::Op::OR, $1, $3); }
+    | expr IMPLIES expr    { $$ = binary(noise::Expr::Op::IMPLIES, $1, $3); }
     ;
 
 quoted_string:

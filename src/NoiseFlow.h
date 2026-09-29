@@ -10,6 +10,8 @@ namespace noise {
 
 class Macro;
 class ContextManager;
+class VarBlock;
+class VarSolver;
 
 class NoiseFlow {
   public:
@@ -31,15 +33,35 @@ class NoiseFlow {
     Macro* find_macro(const std::string& id) const;
     std::mt19937_64& gen() { return _gen; }
     ContextManager* context_manager() const { return _context_manager; }
+    VarSolver* var_solver() const { return _var_solver; }
 
     bool is_expandable(const std::string& id) const;
 
+    /// current macro expansion nesting depth (see invoke_macro in
+    /// DocParser.yy and config::MAX_DEPTH)
+    int64_t& depth() { return _depth; }
+
+    /// A top level (global scope) VARS clause. Resolved lazily, once, by
+    /// the first top level expand() - not at import time, as the seed may
+    /// only be set by a later command line option.
+    void add_global_vars(std::shared_ptr<const VarBlock> vars);
+
+    /// A global param (e.g. from the command line's --define): name -> value,
+    /// visible to every scope below it (the document, macro bodies, VARS
+    /// constraints). A later definition of the same name shadows it.
+    void define_param(const std::string& name, const std::string& value);
+    void resolve_globals();
+
   private:
     ContextManager* _context_manager;
+    VarSolver* _var_solver;
     std::map<std::string,Macro*> _macros;
     std::mt19937_64 _gen;
     std::vector<std::filesystem::path> _include_dirs;
     std::set<std::filesystem::path> _importing;
+    std::vector<std::shared_ptr<const VarBlock>> _global_vars;
+    bool _globals_resolved = false;
+    int64_t _depth = 0;
 };
 
 }; // namespace noise

@@ -50,6 +50,7 @@ class NoiseCmd : public Cmd {
     int process_def_file(int idx);
     int process_include_path(int idx);
     int process_seed(int idx);
+    int process_define(int idx);
     int process_mode(int idx);
     int process_log_level(int idx);
     int process_log_file(int idx);
@@ -85,6 +86,10 @@ NoiseCmd::NoiseCmd(int argc, char** argv)
     add<string>("include-path", 'I', "",
         "':'-separated search path for INCLUDE'd def files",
         CB(process_include_path));
+    add<string>("define", 'D', "",
+        "define a global param: <name>[=<value>] (value defaults to 'true').\n"
+        "May be repeated; applies to the files that follow it",
+        CB(process_define));
     add<long>("seed", 's', 0,
         "set seed (long int)",
         CB(process_seed));
@@ -182,6 +187,17 @@ int NoiseCmd::process_seed(int idx) {
     opt->value(seed);
     _noise_flow.seed(static_cast<uint64_t>(seed));
     INFO(401, "setting seed to {}", seed);
+    return cap;
+}
+
+int NoiseCmd::process_define(int idx) {
+    string def;
+    int cap = check_arg("define", def);
+    auto eq = def.find('=');
+    string name = def.substr(0, eq);
+    string value = eq == string::npos ? string("true") : def.substr(eq + 1);
+    _noise_flow.define_param(name, value);
+    INFO(408, "defining global param {}={}", name, value);
     return cap;
 }
 

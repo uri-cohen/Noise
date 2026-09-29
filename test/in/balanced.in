@@ -1,3 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 1. literal parens, not a macro call: show_arg(value = f(a,b))
 2. literal angles, not a macro call: show_arg(value = f<a,b>)
 3. nested literal groups: show_arg(value = f(a,g(b,c),d))

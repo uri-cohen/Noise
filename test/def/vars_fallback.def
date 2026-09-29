@@ -1,0 +1,12 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# unsatisfiable: every variable of the block takes its fallback value
+MACRO fb = {
+    TEXT = "[a b c d]";
+    VARS = {
+        INT a = 0x10;
+        BOOL b = yes;
+        STRING c = "some text";
+        REAL d = 2.50;
+        ASSERT a > 1 AND a < 0;
+    };
+};
