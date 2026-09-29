@@ -37,6 +37,23 @@ function(add_cli_test test_name)
     )
 endfunction()
 
+# Like add_cli_test, but noise must fail cleanly (exit status 1 - a crash
+# doesn't count) and its stderr (the error) is diffed against the .ex file.
+function(add_cli_error_test test_name)
+    string(JOIN "|" extra_args ${ARGN})
+    add_test(
+        NAME cli_${test_name}
+        COMMAND ${CMAKE_COMMAND}
+            -DNOISE_EXE=$<TARGET_FILE:noise>
+            "-DEXTRA_ARGS=${extra_args}"
+            -DEXPECT_ERROR=1
+            -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
+            -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
+            -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_test.cmake
+    )
+endfunction()
+
 add_cli_test(basic)
 add_cli_test(args)
 add_cli_test(attrs)
@@ -58,4 +75,6 @@ add_cli_test(vars_string)
 add_cli_test(vars_fallback)
 add_cli_test(vars_smtlib)
 add_cli_test(config_params -D NOISE_REAL_RANGE=0.001)
+add_cli_test(depth_limit -D NOISE_MAX_DEPTH=3)
+add_cli_error_test(depth_self_recursion)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)

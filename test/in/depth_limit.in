@@ -1,0 +1,2 @@
+within the global limit: d2
+overridden per call: d0<NOISE_MAX_DEPTH=5>

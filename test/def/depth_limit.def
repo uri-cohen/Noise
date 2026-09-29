@@ -1,0 +1,8 @@
+# a terminating chain d0 -> d1 -> d2 -> d3 -> d4 is 5 levels deep; the global
+# NOISE_MAX_DEPTH=3 (see CMakeLists.txt) is overridden by a call site param,
+# which also applies to the calls nested within it
+MACRO d0 = { TEXT = "d1"; };
+MACRO d1 = { TEXT = "d2"; };
+MACRO d2 = { TEXT = "d3"; };
+MACRO d3 = { TEXT = "d4"; };
+MACRO d4 = { TEXT = "end of chain"; };

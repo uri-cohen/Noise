@@ -22,6 +22,10 @@ inline constexpr int64_t MAX_PROBES_DEFAULT = 128;
 // VARS solver: a REAL variable is sampled within [-range, range]
 inline constexpr const char* REAL_RANGE = "NOISE_REAL_RANGE";
 inline constexpr double REAL_RANGE_DEFAULT = 1e9;
+// macro expansion nesting (recursion) limit - far below the few thousands
+// levels a default (8MB) stack holds
+inline constexpr const char* MAX_DEPTH = "NOISE_MAX_DEPTH";
+inline constexpr int64_t MAX_DEPTH_DEFAULT = 256;
 }  // namespace config
 
 class Context {

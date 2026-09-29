@@ -179,6 +179,13 @@ static std::string expand_until_stable(noise::DocLexerExtra* extra,
     return prev;
 }
 
+// Counts one macro expansion nesting level for the guard's lifetime.
+struct DepthGuard {
+    explicit DepthGuard(int64_t& depth) : _depth(depth) { ++_depth; }
+    ~DepthGuard() { --_depth; }
+    int64_t& _depth;
+};
+
 static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& name,
                                  std::vector<noise::Binding> params,
                                  std::vector<noise::Binding> args) {
@@ -194,6 +201,16 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 
     noise::ContextManager* cm = extra->owner->context_manager();
     cm->push(std::move(ctx));
+    // Checked once the call's own params are bound, so a call site param
+    // (m<NOISE_MAX_DEPTH=...>) already applies to this very call.
+    int64_t max_depth = cm->config_int(noise::config::MAX_DEPTH,
+                                       noise::config::MAX_DEPTH_DEFAULT, 1);
+    if (extra->owner->depth() >= max_depth) {
+        throw noise::NoiseMacroCallError(std::format(
+            "macro '{}' exceeds the expansion nesting depth limit "
+            "NOISE_MAX_DEPTH={} (a macro expanding itself?)", name, max_depth));
+    }
+    DepthGuard depth_guard(extra->owner->depth());
     // VARS are resolved right after the params (their constraints may refer
     // to them) and are then visible to the body just like params.
     bool has_vars = macro->vars() != nullptr;

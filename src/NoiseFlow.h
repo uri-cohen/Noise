@@ -35,6 +35,10 @@ class NoiseFlow {
 
     bool is_expandable(const std::string& id) const;
 
+    /// current macro expansion nesting depth (see invoke_macro in
+    /// DocParser.yy and config::MAX_DEPTH)
+    int64_t& depth() { return _depth; }
+
     /// A top level (global scope) VARS clause. Resolved lazily, once, by
     /// the first top level expand() - not at import time, as the seed may
     /// only be set by a later command line option.
@@ -54,6 +58,7 @@ class NoiseFlow {
     std::set<std::filesystem::path> _importing;
     std::vector<std::shared_ptr<const VarBlock>> _global_vars;
     bool _globals_resolved = false;
+    int64_t _depth = 0;
 };
 
 }; // namespace noise
