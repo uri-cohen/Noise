@@ -228,14 +228,36 @@ An out-of-range parameter is an error.
 | `repeat` | | `text` (required), `count` (1) | `text` repeated `count` times |
 | `select` | `unit` (`word`), `count` (1), `dups` (false), `sorted` (false) | `text` (required) | picks `count` random items of `text` |
 | `foreach` | `unit` (`word`), `var` (`item`) | `items`, `text` (both required) | expands `text` once per item, with `var` set to it |
+| `substr` | `str`, `msb` (both required), `lsb` (`msb`), `fmt` (none) | | characters `msb` down to `lsb` of `str` formatted by `fmt` |
 
 A `unit` is `word`, `line` or `paragraph`. `select` picks each item at most
 once, in random order; `dups` allows repeats (implied when `count` exceeds the
 number of items) and `sorted` keeps the source order.
 
+`substr` selects characters Verilog style, like a [bit select](#constraints):
+positions count from the right - `0` is the last character, e.g. a number's
+least significant digit - and `[msb:lsb]` includes both ends; without `lsb` it
+is the single character at `msb`. Positions are characters (not bytes), never
+negative; anything but `0 <= lsb <= msb < length` is an error. `fmt` is
+applied first: a format spec as for the distributions' `fmt`, used on `str` as
+an integer if it is one (`fmt=08b` for binary digits, `fmt=x` for hex), else
+as a real number, else as text. `str` is a param, so it is expanded first;
+like any value, it needs `\,` for a comma, and `fmt` needs `\<` / `\>` for
+alignment (`fmt=\>8`). Like any macro's output, the result is expanded again:
+a selection that happens to spell a macro or variable name is expanded too.
+
+**A caveat for `fmt` inside macros:** a param's value is expanded until it no
+longer changes, so any name in scope inside it is replaced - quotes and `\`
+protect only the first round. In a macro with a variable `b`, `fmt=08b`
+becomes `fmt=08<b's value>`. Don't give params or variables names that occur
+in format specs you use (`b`, `x`, `d`, `f`, `e`, ...). This applies to the
+distributions' `fmt` as well.
+
 ```
 $ echo 'uniform_dist<a=1, b=6, fmt=.0f> | select<count=2>(text=red green blue) | repeat(kws text="ab ", count=3)' | noise -s 3
 4 | green blue | ab ab ab
+$ echo 'substr<165, 7, 4, fmt=08b> substr<Hello world, 4, 0>' | noise
+1010 world
 $ echo 'foreach<unit=line>(items="apples
 pears", kws text="- item
 ")' | noise
@@ -326,8 +348,9 @@ VARS = {
 ```
 
 Bit selects exist only in constraints. In a macro's text, `b[0]` is the
-variable's value followed by the text `[0]`; to print some of its bits, give
-them a variable of their own (`BITVEC[4] high; ASSERT high == b[7:4];`).
+variable's value followed by the text `[0]`; to print some of its bits, use
+[`substr`](#text) on its binary digits - `substr<byte, 7, 4, fmt=08b>` - or
+give them a variable of their own (`BITVEC[4] high; ASSERT high == byte[7:4];`).
 
 A name is a variable only if it was declared *earlier in the same block*. Any
 other name is looked up among the params, global params and outer variables
