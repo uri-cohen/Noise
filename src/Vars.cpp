@@ -53,6 +53,13 @@ ExprPtr Expr::cast(const VarType& type, ExprPtr a) {
     return e;
 }
 
+ExprPtr Expr::slice(ExprPtr base, ExprPtr hi, ExprPtr lo) {
+    auto e = std::make_shared<Expr>();
+    e->op = Op::SLICE;
+    e->kids = {base, hi, lo};
+    return e;
+}
+
 const char* op_name(Expr::Op op) {
     using enum Expr::Op;
     switch (op) {
@@ -83,6 +90,8 @@ const char* op_name(Expr::Op op) {
     case XOR: return "XOR";
     case OR: return "OR";
     case IMPLIES: return "->";
+    case INDEX: return "[i]";
+    case SLICE: return "[hi:lo]";
     }
     return "?";
 }

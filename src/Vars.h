@@ -40,6 +40,11 @@ struct Expr {
         MUL, DIV, MOD, ADD, SUB, SHL, SHR,
         LT, LE, GT, GE, EQ, NE,
         BITAND, BITXOR, BITOR, AND, XOR, OR, IMPLIES,
+        // Verilog-like bit select of a BITVEC: INDEX b[i] (kids: b, i) and
+        // SLICE b[hi:lo] (kids: b, hi, lo). Indices are LITERAL or NAME
+        // leaves holding non-negative integers (a VAR is rejected at solve
+        // time - Z3's extract needs constants).
+        INDEX, SLICE,
     };
 
     Op op;
@@ -55,6 +60,9 @@ struct Expr {
                                               std::shared_ptr<const Expr> b);
     static std::shared_ptr<const Expr> cast(const VarType& type,
                                             std::shared_ptr<const Expr> a);
+    static std::shared_ptr<const Expr> slice(std::shared_ptr<const Expr> base,
+                                             std::shared_ptr<const Expr> hi,
+                                             std::shared_ptr<const Expr> lo);
 };
 
 using ExprPtr = std::shared_ptr<const Expr>;

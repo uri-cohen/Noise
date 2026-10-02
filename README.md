@@ -297,17 +297,37 @@ A **fallback** value is used if the constraints can't be satisfied (below).
 
 `ASSERT expression;` adds a constraint. Precedence is C-like, highest first:
 
-1. unary `-` `~` `NOT`, casts `(TYPE)x`
-2. `*` `/` `%`
-3. `+` `-`
-4. `<<` `>>`
-5. `<` `<=` `>` `>=`
-6. `==` `!=`
-7. `&`, then `^`, then `|`
-8. `AND`, then `XOR`, then `OR`
-9. `->`
+1. bit selects `b[i]` `b[hi:lo]`
+2. unary `-` `~` `NOT`, casts `(TYPE)x`
+3. `*` `/` `%`
+4. `+` `-`
+5. `<<` `>>`
+6. `<` `<=` `>` `>=`
+7. `==` `!=`
+8. `&`, then `^`, then `|`
+9. `AND`, then `XOR`, then `OR`
+10. `->`
 
 As in C, `/` truncates toward zero and `>>` on an `INT` keeps the sign.
+
+**Bit selects** pick bits of a `BITVEC`, Verilog style: `b[0]` is the least
+significant bit, `b[i]` is bit `i` (a `BITVEC[1]`), and `b[hi:lo]` is bits `hi`
+down to `lo`, both included (a `BITVEC[hi-lo+1]`). They work on any `BITVEC`
+expression - `(a ^ b)[3:0]` - and on other integers through a cast:
+`((BITVEC[64])i)[7:0]`. An index is an integer literal or a param's name; it
+can't be a variable. A reversed range (`b[3:7]`), an index beyond the width,
+or a bit select of a non-`BITVEC` is an error when the variables are resolved.
+
+```
+VARS = {
+    BITVEC[8] v;
+    ASSERT v[7:6] == 2 AND v[0] == 1 AND v[5:1] == 0;   # v is 129
+};
+```
+
+Bit selects exist only in constraints. In a macro's text, `b[0]` is the
+variable's value followed by the text `[0]`; to print some of its bits, give
+them a variable of their own (`BITVEC[4] high; ASSERT high == b[7:4];`).
 
 A name is a variable only if it was declared *earlier in the same block*. Any
 other name is looked up among the params, global params and outer variables

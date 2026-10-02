@@ -214,6 +214,11 @@ class Resolver {
             return _vars.at(_var_idx.at(x.text)).decl.type;
         case Op::CAST:
             return x.type;
+        case Op::INDEX:
+        case Op::SLICE: {
+            auto [hi, lo] = bit_range(x);
+            return VarType{VarKind::BITVEC, static_cast<unsigned>(hi - lo + 1)};
+        }
         case Op::NOT: case Op::AND: case Op::OR: case Op::XOR: case Op::IMPLIES:
         case Op::LT: case Op::LE: case Op::GT: case Op::GE: case Op::EQ: case Op::NE:
             return VarType{VarKind::BOOL};
@@ -226,6 +231,48 @@ class Resolver {
             }
             return static_type(*x.kids[1]);
         }
+    }
+
+    // A bit select's index: a literal, or a name's value (a param) - a
+    // non-negative integer constant, as Z3's extract needs.
+    uint64_t bit_index(const Expr& x) const {
+        if (x.op == Op::VAR) {
+            throw NoiseValueError(format(
+                "bit select index '{}' is a variable - it must be a constant", x.text));
+        }
+        string text = x.op == Op::NAME ? name_text(x) : x.text;
+        auto v = parse_uint64(text);
+        if (!v) {
+            throw NoiseValueError(format(
+                "bit select index '{}' is not a non-negative integer", text));
+        }
+        return *v;
+    }
+
+    // The bits [hi, lo] a bit select (b[i] or b[hi:lo]) picks, checked
+    // against its base: a BITVEC, with hi >= lo, both within its width.
+    std::pair<uint64_t, uint64_t> bit_range(const Expr& x) const {
+        const Expr& base = *x.kids[0];
+        uint64_t hi = bit_index(*x.kids[1]);
+        uint64_t lo = x.op == Op::INDEX ? hi : bit_index(*x.kids[2]);
+        string what = format("{}[{}]", base.op == Op::VAR ? base.text : string("(...)"),
+                             x.op == Op::INDEX ? format("{}", hi) : format("{}:{}", hi, lo));
+        auto t = static_type(base);
+        if (!t || t->kind != VarKind::BITVEC) {
+            throw NoiseValueError(format(
+                "bit select {} applies to a BITVEC only, not to {}", what,
+                t ? t->str() : string("an untyped value")));
+        }
+        if (hi < lo) {
+            throw NoiseValueError(format(
+                "bit select {} is reversed - it must be [hi:lo] with hi >= lo", what));
+        }
+        if (hi >= t->width) {
+            throw NoiseValueError(format(
+                "bit select {} is out of range for {} (bits {}..0)", what, t->str(),
+                t->width - 1));
+        }
+        return {hi, lo};
     }
 
     // Last resort typing of an all-untyped expression: by its leaves' text.
@@ -364,6 +411,14 @@ class Resolver {
         case Op::VAR: {
             const Var& v = _vars.at(_var_idx.at(x.text));
             return typed(v.decl.type, v.e);
+        }
+        case Op::INDEX:
+        case Op::SLICE: {
+            auto [hi, lo] = bit_range(x);
+            VarType base_type = *static_type(*x.kids[0]);
+            z3::expr base = lift(translate(*x.kids[0], base_type), base_type, op_name(x.op));
+            return typed(VarType{VarKind::BITVEC, static_cast<unsigned>(hi - lo + 1)},
+                         base.extract(static_cast<unsigned>(hi), static_cast<unsigned>(lo)));
         }
         case Op::CAST: {
             const Expr& kid = *x.kids[0];

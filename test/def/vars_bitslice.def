@@ -1,0 +1,38 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# Verilog-like bit selects in ASSERT: b[i] (a BITVEC[1]) and b[hi:lo]
+# (hi >= lo, both included; b[0] is the least significant bit)
+MACRO bits = {
+    TEXT = "byte=b high=hi low=lo bit7=top bit_0=bit0 neg_low=x";
+    PARAMS = { k = 3; };
+    VARS = {
+        BITVEC[8] b, hi, lo;
+        BITVEC[1] top, bit0;
+        BITVEC[4] x;
+        INT i;
+        ASSERT b == 0xA5;
+        ASSERT hi == (BITVEC[8])b[7:4];   # cast of the slice (zero extended)
+        ASSERT lo == (BITVEC[8])b[3:0];
+        ASSERT top == b[7] AND bit0 == b[0];
+        ASSERT i == -2;
+        ASSERT x == ((BITVEC[64])i)[k:0]; # an INT through a cast; a param index
+    };
+};
+MACRO precedence = {
+    TEXT = "not_high=n trunc=c xor_low=w";
+    VARS = {
+        BITVEC[8] b;
+        BITVEC[4] n, w;
+        BITVEC[2] c;
+        ASSERT b == 0xA5;
+        ASSERT n == ~b[7:4];              # ~(b[7:4]): a bit select binds tightest
+        ASSERT c == (BITVEC[2])b[7:4];    # the cast applies to the slice
+        ASSERT w == (b ^ 0xFF)[3:0];      # a parenthesized expression
+    };
+};
+MACRO solved = {
+    TEXT = "v";
+    VARS = {
+        BITVEC[8] v;
+        ASSERT v[7:6] == 2 AND v[0] == 1 AND v[5:1] == 0;
+    };
+};
