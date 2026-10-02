@@ -3,7 +3,9 @@
 # (run with -D b=5 -D f=9, see CMakeLists.txt)
 MACRO hi = { TEXT = "hello"; };
 MACRO fmts = {
-    TEXT = "substr<b, 7, 4, fmt=08b> uniform_dist<a=1, b=1, fmt=.0f>";
+    TEXT = "substr<b, 7, 4, fmt=08b> uniform_dist<a=1, b=1, fmt=.0f> substr<b, 7, 0, fmt=0b> substr<255, 1, 0, fmt=0x>";
+    # a bare-letter spec collides with a name in scope: fmt=0b / fmt=0x are
+    # safe spellings of fmt=b / fmt=x
     PARAMS = { f = 9; };
     VARS = { BITVEC[8] b; ASSERT b == 0xA5; };
 };

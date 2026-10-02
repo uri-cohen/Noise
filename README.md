@@ -252,10 +252,11 @@ a selection that happens to spell a macro or variable name is expanded too.
 longer changes, so a name in scope inside it is replaced - quotes and `\`
 protect only the first round. Specs with a width or precision are safe, as a
 word glued to a digit is never a name (`08b`, `.0f`). But a spec that is just a
-letter is a word of its own: in a macro with a variable `x`, `fmt=x` becomes
-`x`'s value. Don't give params or variables single-letter names you use as
-format specs (`b`, `x`, `d`, `f`, `e`, ...); this applies to the
-distributions' `fmt` as well.
+letter is a word of its own: with a param or variable `x` in scope, `fmt=x`
+becomes `x`'s value (escaping or quoting it doesn't help). Write such a spec
+with a `0` in front - `fmt=0x`, `fmt=0b`, `fmt=0d`, `fmt=0f`, `fmt=0e`: the `0`
+(zero padding) has no effect without a width, and the spec is now a word glued
+to a digit. This applies to the distributions' `fmt` as well.
 
 ```
 $ echo 'uniform_dist<a=1, b=6, fmt=.0f> | select<count=2>(text=red green blue) | repeat(kws text="ab ", count=3)' | noise -s 3
