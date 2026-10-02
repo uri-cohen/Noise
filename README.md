@@ -200,7 +200,9 @@ A macro's params and args are available by name and by position
 | `#line`, `#col` | where in the output this macro's expansion starts |
 
 Any name in scope is replaced wherever it appears as a word in the text, so
-give params and variables names that won't collide with ordinary words.
+give params and variables names that won't collide with ordinary words. A word
+glued to a digit or `_` is not a name: with a param `b`, `2b` and `08b` stay
+as they are (and so does a macro name glued that way).
 
 ## Builtin macros
 
@@ -247,10 +249,12 @@ alignment (`fmt=\>8`). Like any macro's output, the result is expanded again:
 a selection that happens to spell a macro or variable name is expanded too.
 
 **A caveat for `fmt` inside macros:** a param's value is expanded until it no
-longer changes, so any name in scope inside it is replaced - quotes and `\`
-protect only the first round. In a macro with a variable `b`, `fmt=08b`
-becomes `fmt=08<b's value>`. Don't give params or variables names that occur
-in format specs you use (`b`, `x`, `d`, `f`, `e`, ...). This applies to the
+longer changes, so a name in scope inside it is replaced - quotes and `\`
+protect only the first round. Specs with a width or precision are safe, as a
+word glued to a digit is never a name (`08b`, `.0f`). But a spec that is just a
+letter is a word of its own: in a macro with a variable `x`, `fmt=x` becomes
+`x`'s value. Don't give params or variables single-letter names you use as
+format specs (`b`, `x`, `d`, `f`, `e`, ...); this applies to the
 distributions' `fmt` as well.
 
 ```

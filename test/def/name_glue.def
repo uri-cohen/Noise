@@ -1,0 +1,9 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# A word glued to a digit or '_' is text: names inside it are not replaced
+# (run with -D b=5 -D f=9, see CMakeLists.txt)
+MACRO hi = { TEXT = "hello"; };
+MACRO fmts = {
+    TEXT = "substr<b, 7, 4, fmt=08b> uniform_dist<a=1, b=1, fmt=.0f>";
+    PARAMS = { f = 9; };
+    VARS = { BITVEC[8] b; ASSERT b == 0xA5; };
+};

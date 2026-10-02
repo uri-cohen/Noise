@@ -243,6 +243,23 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
     return TEXT_TOKEN(yytext);
 }
 
+ /* The same text runs, but ending in a word glued to a digit or '_' (e.g.
+  * "08b", ".0f", " 2b"): by longest match the whole word stays text, so a
+  * name glued to digits is never a macro/param/variable name - otherwise a
+  * format spec like fmt=08b in a macro with a variable b would become
+  * "08<b's value>" (on every re-expansion round, so no quoting or escape
+  * could protect it). A run with nothing glued is matched by the rules above
+  * just as well, which win the tie as the earlier ones. */
+<INITIAL>[^a-zA-Z\n'\"#\\]*[0-9_][a-zA-Z0-9_]* {
+    return TEXT_TOKEN(yytext);
+}
+<EXPECT_PARAMS_STATE>[^a-zA-Z\n'\"#<(>),\\]*[0-9_][a-zA-Z0-9_]* {
+    return TEXT_TOKEN(yytext);
+}
+<EXPECT_ARGS_STATE>[^a-zA-Z\n'\"#(>),\\]*[0-9_][a-zA-Z0-9_]* {
+    return TEXT_TOKEN(yytext);
+}
+
  /* A lone '#' not starting one of the four builtins is just literal text. */
 <INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE># {
     return TEXT_TOKEN(yytext);

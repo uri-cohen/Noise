@@ -111,6 +111,7 @@ add_cli_error_test(substr_range)
 add_cli_test(vars_bitslice)
 add_cli_error_test(vars_bitslice_range)
 add_cli_error_test(vars_bitslice_type)
+add_cli_test(name_glue -D b=5 -D f=9)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)
 
 # ~0.6s on a current machine (unoptimized build)
