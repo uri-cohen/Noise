@@ -200,7 +200,9 @@ A macro's params and args are available by name and by position
 | `#line`, `#col` | where in the output this macro's expansion starts |
 
 Any name in scope is replaced wherever it appears as a word in the text, so
-give params and variables names that won't collide with ordinary words.
+give params and variables names that won't collide with ordinary words. A word
+glued to a digit or `_` is not a name: with a param `b`, `2b` and `08b` stay
+as they are (and so does a macro name glued that way).
 
 ## Builtin macros
 
@@ -228,14 +230,39 @@ An out-of-range parameter is an error.
 | `repeat` | | `text` (required), `count` (1) | `text` repeated `count` times |
 | `select` | `unit` (`word`), `count` (1), `dups` (false), `sorted` (false) | `text` (required) | picks `count` random items of `text` |
 | `foreach` | `unit` (`word`), `var` (`item`) | `items`, `text` (both required) | expands `text` once per item, with `var` set to it |
+| `substr` | `str`, `msb` (both required), `lsb` (`msb`), `fmt` (none) | | characters `msb` down to `lsb` of `str` formatted by `fmt` |
 
 A `unit` is `word`, `line` or `paragraph`. `select` picks each item at most
 once, in random order; `dups` allows repeats (implied when `count` exceeds the
 number of items) and `sorted` keeps the source order.
 
+`substr` selects characters Verilog style, like a [bit select](#constraints):
+positions count from the right - `0` is the last character, e.g. a number's
+least significant digit - and `[msb:lsb]` includes both ends; without `lsb` it
+is the single character at `msb`. Positions are characters (not bytes), never
+negative; anything but `0 <= lsb <= msb < length` is an error. `fmt` is
+applied first: a format spec as for the distributions' `fmt`, used on `str` as
+an integer if it is one (`fmt=08b` for binary digits, `fmt=x` for hex), else
+as a real number, else as text. `str` is a param, so it is expanded first;
+like any value, it needs `\,` for a comma, and `fmt` needs `\<` / `\>` for
+alignment (`fmt=\>8`). Like any macro's output, the result is expanded again:
+a selection that happens to spell a macro or variable name is expanded too.
+
+**A caveat for `fmt` inside macros:** a param's value is expanded until it no
+longer changes, so a name in scope inside it is replaced - quotes and `\`
+protect only the first round. Specs with a width or precision are safe, as a
+word glued to a digit is never a name (`08b`, `.0f`). But a spec that is just a
+letter is a word of its own: with a param or variable `x` in scope, `fmt=x`
+becomes `x`'s value (escaping or quoting it doesn't help). Write such a spec
+with a `0` in front - `fmt=0x`, `fmt=0b`, `fmt=0d`, `fmt=0f`, `fmt=0e`: the `0`
+(zero padding) has no effect without a width, and the spec is now a word glued
+to a digit. This applies to the distributions' `fmt` as well.
+
 ```
 $ echo 'uniform_dist<a=1, b=6, fmt=.0f> | select<count=2>(text=red green blue) | repeat(kws text="ab ", count=3)' | noise -s 3
 4 | green blue | ab ab ab
+$ echo 'substr<165, 7, 4, fmt=08b> substr<Hello world, 4, 0>' | noise
+1010 world
 $ echo 'foreach<unit=line>(items="apples
 pears", kws text="- item
 ")' | noise
@@ -297,17 +324,38 @@ A **fallback** value is used if the constraints can't be satisfied (below).
 
 `ASSERT expression;` adds a constraint. Precedence is C-like, highest first:
 
-1. unary `-` `~` `NOT`, casts `(TYPE)x`
-2. `*` `/` `%`
-3. `+` `-`
-4. `<<` `>>`
-5. `<` `<=` `>` `>=`
-6. `==` `!=`
-7. `&`, then `^`, then `|`
-8. `AND`, then `XOR`, then `OR`
-9. `->`
+1. bit selects `b[i]` `b[hi:lo]`
+2. unary `-` `~` `NOT`, casts `(TYPE)x`
+3. `*` `/` `%`
+4. `+` `-`
+5. `<<` `>>`
+6. `<` `<=` `>` `>=`
+7. `==` `!=`
+8. `&`, then `^`, then `|`
+9. `AND`, then `XOR`, then `OR`
+10. `->`
 
 As in C, `/` truncates toward zero and `>>` on an `INT` keeps the sign.
+
+**Bit selects** pick bits of a `BITVEC`, Verilog style: `b[0]` is the least
+significant bit, `b[i]` is bit `i` (a `BITVEC[1]`), and `b[hi:lo]` is bits `hi`
+down to `lo`, both included (a `BITVEC[hi-lo+1]`). They work on any `BITVEC`
+expression - `(a ^ b)[3:0]` - and on other integers through a cast:
+`((BITVEC[64])i)[7:0]`. An index is an integer literal or a param's name; it
+can't be a variable. A reversed range (`b[3:7]`), an index beyond the width,
+or a bit select of a non-`BITVEC` is an error when the variables are resolved.
+
+```
+VARS = {
+    BITVEC[8] v;
+    ASSERT v[7:6] == 2 AND v[0] == 1 AND v[5:1] == 0;   # v is 129
+};
+```
+
+Bit selects exist only in constraints. In a macro's text, `b[0]` is the
+variable's value followed by the text `[0]`; to print some of its bits, use
+[`substr`](#text) on its binary digits - `substr<byte, 7, 4, fmt=08b>` - or
+give them a variable of their own (`BITVEC[4] high; ASSERT high == byte[7:4];`).
 
 A name is a variable only if it was declared *earlier in the same block*. Any
 other name is looked up among the params, global params and outer variables

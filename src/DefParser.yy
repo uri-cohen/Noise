@@ -144,6 +144,7 @@ void finalize(noise::DefLexerExtra* extra) {
 %left '+' '-'
 %left '*' '/' '%'
 %precedence UNARY
+%precedence '['      /* postfix bit select binds tightest: -b[0] is -(b[0]) */
 
 %nterm def_file
 %nterm defs
@@ -164,6 +165,7 @@ void finalize(noise::DefLexerExtra* extra) {
 %nterm var_decl
 %nterm <noise::VarType> var_type
 %nterm <noise::ExprPtr> expr
+%nterm <noise::ExprPtr> bit_index
 
 %start def_file
 
@@ -295,6 +297,10 @@ expr:
       }
     | '(' expr ')' { $$ = $2; }
     | '(' var_type ')' expr %prec UNARY { $$ = noise::Expr::cast($2, $4); }
+    /* Verilog-like bit select of a BITVEC: b[i] and b[hi:lo] (hi >= lo, both
+     * included); typing and range checks happen at solve time. */
+    | expr '[' bit_index ']' { $$ = binary(noise::Expr::Op::INDEX, $1, $3); }
+    | expr '[' bit_index ':' bit_index ']' { $$ = noise::Expr::slice($1, $3, $5); }
     | '-' expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::NEG, $2); }
     | '~' expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::BITNOT, $2); }
     | NOT expr %prec UNARY { $$ = noise::Expr::unary(noise::Expr::Op::NOT, $2); }
@@ -318,6 +324,17 @@ expr:
     | expr XOR expr        { $$ = binary(noise::Expr::Op::XOR, $1, $3); }
     | expr OR expr         { $$ = binary(noise::Expr::Op::OR, $1, $3); }
     | expr IMPLIES expr    { $$ = binary(noise::Expr::Op::IMPLIES, $1, $3); }
+    ;
+
+/* A bit select index: an integer literal, or a name resolved at solve time
+ * (a param); a variable is rejected then, as Z3's extract needs constants. */
+bit_index:
+    LITERAL { $$ = noise::Expr::leaf(noise::Expr::Op::LITERAL, $1); }
+    | ID {
+          $$ = noise::Expr::leaf(extra->curr_vars->declared($1)
+                                     ? noise::Expr::Op::VAR
+                                     : noise::Expr::Op::NAME, $1);
+      }
     ;
 
 quoted_string:

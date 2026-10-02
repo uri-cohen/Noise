@@ -44,4 +44,11 @@ class ForeachMacro : public Macro {
     std::string expand(ContextManager* context_manager) override;
 };  // class ForeachMacro
 
+class SubstrMacro : public Macro {
+  public:
+    SubstrMacro(NoiseFlow* owner);
+    ~SubstrMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class SubstrMacro
+
 };  // namespace noise

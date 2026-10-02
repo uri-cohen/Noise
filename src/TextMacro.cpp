@@ -4,9 +4,11 @@
 //
 #include <Binding.h>
 #include <Context.h>
+#include <Exception.h>
 #include <NoiseFlow.h>
 #include <TextMacro.h>
 #include <Utils.h>
+#include <Vars.h>
 
 using std::format;
 using std::string;
@@ -143,6 +145,88 @@ string ForeachMacro::expand(ContextManager* context_manager) {
         context_manager->pop();
     }
     return out.str();
+}
+
+// substr<str, msb[, lsb][, fmt]>: Verilog-style selection of characters of
+// str, formatted by fmt first. Positions count from the right - 0 is the last
+// character (the least significant digit of a formatted number) - and
+// [msb:lsb] includes both ends; lsb defaults to msb (a single character).
+// Positions are characters (UTF-8 code points), not bytes; anything but
+// 0 <= lsb <= msb < length is an error (no negatives, no clamping).
+// fmt is a std::format spec (the part after ':' in "{:...}", as in the
+// <dist>_dist macros' fmt) applied to str as an integer if it is one, else as
+// a real number if it is one, else as text; empty: str as is.
+// str is a param, so it is fully expanded before formatting.
+SubstrMacro::SubstrMacro(NoiseFlow* owner) : Macro("substr") {
+    set_owner(owner);
+    add_param(Binding("str", "", BindingAttr::REQUIRED));
+    add_param(Binding("msb", "", BindingAttr::REQUIRED));
+    add_param(Binding("lsb", ""));
+    add_param(Binding("fmt", ""));
+}
+
+namespace {
+
+string format_value(const string& str, const string& fmt) {
+    if (fmt.empty()) {
+        return str;
+    }
+    string spec = "{:" + fmt + "}";
+    try {
+        if (auto i = parse_int64(str)) {
+            return std::vformat(spec, std::make_format_args(*i));
+        }
+        if (auto u = parse_uint64(str)) {
+            return std::vformat(spec, std::make_format_args(*u));
+        }
+        if (auto d = parse_real(str)) {
+            return std::vformat(spec, std::make_format_args(*d));
+        }
+        return std::vformat(spec, std::make_format_args(str));
+    } catch (const std::format_error& e) {
+        throw NoiseValueError(format(
+            "substr fmt '{}' can't format '{}': {}", fmt, str, e.what()));
+    }
+}
+
+}  // namespace
+
+string SubstrMacro::expand(ContextManager* context_manager) {
+    string str = context_manager->get("str").value_or("");
+    string msb_text = context_manager->get("msb").value_or("");
+    string lsb_text = context_manager->get("lsb").value_or("");
+    string fmt = context_manager->get("fmt").value_or("");
+
+    string text = format_value(str, fmt);
+    // byte offset of each character's start, plus the end
+    std::vector<size_t> starts;
+    for (size_t i = 0; i < text.size(); ++i) {
+        if ((static_cast<unsigned char>(text[i]) & 0xC0) != 0x80) {
+            starts.push_back(i);
+        }
+    }
+    size_t length = starts.size();
+    starts.push_back(text.size());
+
+    auto position = [&](const string& name, const string& value) {
+        auto v = parse_uint64(value);
+        if (!v) {
+            throw NoiseValueError(format(
+                "substr {} '{}' is not a non-negative integer", name, value));
+        }
+        return *v;
+    };
+    uint64_t msb = position("msb", msb_text);
+    uint64_t lsb = trim(lsb_text).empty() ? msb : position("lsb", lsb_text);
+    if (lsb > msb || msb >= length) {
+        throw NoiseValueError(format(
+            "substr [{}:{}] is invalid for '{}' ({} characters; 0 <= lsb <= msb < {} "
+            "is required)", msb, lsb, text, length, length));
+    }
+    // position p (from the right) is character length-1-p from the left
+    size_t first = length - 1 - msb;
+    size_t last = length - 1 - lsb;
+    return text.substr(starts[first], starts[last + 1] - starts[first]);
 }
 
 };  // namespace noise
