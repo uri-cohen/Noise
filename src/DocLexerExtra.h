@@ -61,6 +61,8 @@ struct DocLexerExtra {
     bool is_macro(const std::string& id) const;
     std::optional<std::string> context_value(const std::string& id) const;
     bool is_bool_formal(const std::string& id) const;
+    // records an unknown $name at the current location (see NoiseFlow)
+    void unknown_name(const std::string& name) const;
 
     void emit(const std::string& text);
 

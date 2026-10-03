@@ -1,0 +1,5 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. plain words: b f hi fmts 08b .0f 2b _b
+2. names: $b $f ($b) $hi
+3. a name is the longest identifier after $: $b2 is not $b followed by 2
+4. format specs, beside names they spell: $fmts

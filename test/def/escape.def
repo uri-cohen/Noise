@@ -1,6 +1,6 @@
 # Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 macro show = {
-  text = "[value]";
+  text = "[$value]";
   args = {
     value = "";
   };

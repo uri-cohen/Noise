@@ -2,16 +2,16 @@
 # constraints may refer to the macro's own params and to outer variables;
 # an inner VARS declaration shadows an outer variable of the same name
 MACRO below = {
-    TEXT = "[val < limit]";
+    TEXT = "[$val < $limit]";
     PARAMS = { limit = 5; };
     VARS = { UINT val; ASSERT val < limit; ASSERT val >= limit - 1; };
 };
 MACRO outer = {
-    TEXT = "out: val in: holder";
+    TEXT = "out: $val in: $holder";
     VARS = { INT val = 0; ASSERT val == 42; };
 };
 MACRO inner = {
-    TEXT = "{val from base}";
+    TEXT = "{$val from $base}";
     VARS = { INT base, val; ASSERT base == 100; ASSERT val == val2 + base; };
 };
-MACRO holder = { TEXT = "[inner]"; VARS = { INT val2; ASSERT val2 == 7; }; };
+MACRO holder = { TEXT = "[$inner]"; VARS = { INT val2; ASSERT val2 == 7; }; };

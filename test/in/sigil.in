@@ -1,0 +1,7 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. plain words: greet who num
+2. names: $greet / $greet<you> / $num
+3. environment: $NOISE_SIGIL_GREETING
+4. literal $: \$greet, $5, US$ 3, a lone $ sign
+5. literal $ through macros: $shell / $repeat(text=\$HOME, count=2)
+6. unknown names expand to nothing: [$nosuch] [$nosuch] [$missing]

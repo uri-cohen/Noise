@@ -30,6 +30,10 @@ inline constexpr int64_t MAX_DEPTH_DEFAULT = 256;
 // changing (Expansion Flow step 7)
 inline constexpr const char* MAX_EXPANSIONS = "NOISE_MAX_EXPANSIONS";
 inline constexpr int64_t MAX_EXPANSIONS_DEFAULT = 64;
+// unknown $names reported at the end of a run in the warning itself; more
+// than this many go to a details file the warning refers to
+inline constexpr const char* MAX_UNKNOWN_WARNING = "NOISE_MAX_UNKNOWN_WARNING";
+inline constexpr int64_t MAX_UNKNOWN_WARNING_DEFAULT = 10;
 }  // namespace config
 
 class Context {

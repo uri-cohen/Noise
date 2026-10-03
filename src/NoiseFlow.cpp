@@ -10,6 +10,9 @@
 #include <TextMacro.h>
 #include <VarSolver.h>
 #include <Vars.h>
+#include <Logger.h>
+
+extern char** environ;
 
 using std::format;
 
@@ -118,6 +121,69 @@ void NoiseFlow::define_param(const std::string& name, const std::string& value)
     Context ctx;
     ctx.add_map(name, value);
     _context_manager->push(std::move(ctx));
+}
+
+void NoiseFlow::import_environment()
+{
+    static const std::regex ID_RE("[a-zA-Z][a-zA-Z0-9_]*");
+    Context ctx;
+    for (char** e = environ; e && *e; ++e) {
+        std::string entry(*e);
+        auto eq = entry.find('=');
+        std::string name = entry.substr(0, eq);
+        if (eq != std::string::npos && std::regex_match(name, ID_RE)) {
+            ctx.add_map(name, entry.substr(eq + 1));
+        }
+    }
+    _context_manager->push(std::move(ctx));
+}
+
+void NoiseFlow::record_unknown(const std::string& name, const std::string& where)
+{
+    _unknowns.emplace_back(name, where);
+}
+
+void NoiseFlow::report_unknowns(const std::filesystem::path& details_dir)
+{
+    if (_unknowns.empty()) {
+        return;
+    }
+    // distinct names, in order of first occurrence, with their counts
+    std::vector<std::string> names;
+    std::map<std::string, size_t> counts;
+    for (const auto& [name, where] : _unknowns) {
+        if (counts[name]++ == 0) {
+            names.push_back(name);
+        }
+    }
+    size_t n = _unknowns.size();
+    int64_t max = _context_manager->config_int(
+        config::MAX_UNKNOWN_WARNING, config::MAX_UNKNOWN_WARNING_DEFAULT, 0);
+    std::string head = format("{} unknown $name{} expanded to nothing", n,
+                              n == 1 ? "" : "s");
+    if (static_cast<int64_t>(n) <= max) {
+        std::string list;
+        for (const auto& name : names) {
+            list += format("{}${}", list.empty() ? "" : ", ", name);
+            if (counts[name] > 1) {
+                list += format(" (x{})", counts[name]);
+            }
+        }
+        WARNING(302, "{}: {}", head, list);
+        return;
+    }
+    std::filesystem::path file = details_dir / "noise-unknown.txt";
+    std::ofstream out(file);
+    for (const auto& [name, where] : _unknowns) {
+        out << where << " $" << name << "\n";
+    }
+    if (!out) {
+        WARNING(303, "{} ({} distinct) - failed writing the details to '{}'", head,
+                names.size(), file.string());
+        return;
+    }
+    WARNING(304, "{} ({} distinct) - details in '{}'", head, names.size(),
+            file.string());
 }
 
 void NoiseFlow::resolve_globals()

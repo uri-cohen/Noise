@@ -1,17 +1,17 @@
 Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
-m1 x
-m1"b" z
-m1'b' z
-m1#foo
-m1,x>)
-wrap(m1 )
-wrap(m1 x)
-wrap(m1
+$m1 x
+$m1"b" z
+$m1'b' z
+$m1#foo
+$m1,x>)
+$wrap($m1 )
+$wrap($m1 x)
+$wrap($m1
 )
-wrap(m1#foo)
-wrap<m1"b">(x)
-wrap(a=m1 )
-wrap(m1,m1)
-wrap<m1 >(x)
-wrap(m1\,x)
-wrap(wrap(m1 ) )
+$wrap($m1#foo)
+$wrap<$m1"b">(x)
+$wrap(a=$m1 )
+$wrap($m1,$m1)
+$wrap<$m1 >(x)
+$wrap($m1\,x)
+$wrap($wrap($m1 ) )

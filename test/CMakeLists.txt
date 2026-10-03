@@ -55,6 +55,23 @@ function(add_cli_error_test test_name)
     )
 endfunction()
 
+# Like add_cli_test, but its stderr - the warnings - is diffed too, against
+# expected/<test_name>.err (and noise must exit with status 0).
+function(add_cli_warning_test test_name)
+    string(JOIN "|" extra_args ${ARGN})
+    add_test(
+        NAME cli_${test_name}
+        COMMAND ${CMAKE_COMMAND}
+            -DNOISE_EXE=$<TARGET_FILE:noise>
+            "-DEXTRA_ARGS=${extra_args}"
+            -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
+            -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
+            -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
+            -DWARN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.err
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_test.cmake
+    )
+endfunction()
+
 # Performance regression check: runs a def/doc pair like add_cli_test (but
 # without diffing its randomized output) and fails if it takes longer than
 # budget_ms x NOISE_PERF_SCALE. The base budgets leave a wide margin (~10x)
@@ -111,7 +128,11 @@ add_cli_error_test(substr_range)
 add_cli_test(vars_bitslice)
 add_cli_error_test(vars_bitslice_range)
 add_cli_error_test(vars_bitslice_type)
-add_cli_test(name_glue -D b=5 -D f=9)
+add_cli_warning_test(plain_words -D b=5 -D f=9)
+add_cli_warning_test(sigil)
+set_tests_properties(cli_sigil PROPERTIES
+    ENVIRONMENT "NOISE_SIGIL_GREETING=hello from the environment;NOISE_SIGIL_NUM=42")
+add_cli_warning_test(sigil_unknown_file -D NOISE_MAX_UNKNOWN_WARNING=2)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)
 
 # ~0.6s on a current machine (unoptimized build)

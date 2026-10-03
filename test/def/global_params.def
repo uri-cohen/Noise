@@ -2,8 +2,8 @@
 # global params come from the command line (-D/--define, see CMakeLists.txt):
 # visible to macro bodies and to global and macro VARS constraints
 VARS = { INT twice; ASSERT twice == level * 2; };
-MACRO greet = { TEXT = "hello who (flag)"; };
+MACRO greet = { TEXT = "hello $who ($flag)"; };
 MACRO below = {
-    TEXT = "[v]";
+    TEXT = "[$v]";
     VARS = { UINT v; ASSERT v < level; ASSERT v >= level - 1; };
 };

@@ -1,0 +1,10 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# Only $name is a name: plain words - even ones spelling a macro, param or
+# variable name - are never replaced (run with -D b=5 -D f=9, CMakeLists.txt)
+MACRO hi = { TEXT = "hello"; };
+MACRO fmts = {
+    # format specs are plain words too, so they never collide with names
+    TEXT = "$substr<$b, 7, 4, fmt=08b> $uniform_dist<a=1, b=1, fmt=.0f> $substr<$b, 7, 0, fmt=b> $substr<255, 1, 0, fmt=x>";
+    PARAMS = { f = 9; };
+    VARS = { BITVEC[8] b; ASSERT b == 0xA5; };
+};

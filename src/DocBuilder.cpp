@@ -40,6 +40,11 @@ std::optional<std::string> DocLexerExtra::context_value(const std::string& id) c
     return owner->context_manager()->get(id);
 }
 
+void DocLexerExtra::unknown_name(const std::string& name) const {
+    owner->record_unknown(name, std::format("{}:{}.{}", stream_id, loc.begin.line,
+                                            loc.begin.column));
+}
+
 bool DocLexerExtra::is_bool_formal(const std::string& id) const {
     Macro* macro = owner->find_macro(pending_macro_name);
     if (!macro) {

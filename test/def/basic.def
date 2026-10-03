@@ -9,7 +9,7 @@ EOF
 };
 
 macro m_2 = {
-  text = "the second macro contains the first: (m_1)";
+  text = "the second macro contains the first: ($m_1)";
 };
 
 # end
