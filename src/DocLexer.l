@@ -43,6 +43,28 @@ using std::string;
 
 #define yyterminate() return noise::DocParser::make_END_OF_FILE(yyextra->loc)
 
+/* "$name" (or "$param[i]") in text being expanded: the name's value; an
+ * unknown name expands to nothing, and is recorded for the end-of-run
+ * warning. */
+static noise::DocParser::symbol_type expand_name(DocLexerExtra* x, const char* name) {
+    if (auto cv = x->context_value(name)) {
+        return noise::DocParser::make_CONTEXT_VALUE(*cv, x->loc);
+    }
+    x->unknown_name(name);
+    return noise::DocParser::make_CONTEXT_VALUE("", x->loc);
+}
+
+/* "$name" inside a param/arg value: its value if the name is known now;
+ * otherwise kept as raw text ("$name"), to be resolved when the value itself
+ * is expanded - an arg may well refer to a name only bound then (e.g. a
+ * foreach loop variable). */
+static noise::DocParser::symbol_type value_name(DocLexerExtra* x, const char* text) {
+    if (auto cv = x->context_value(text + 1)) {
+        return noise::DocParser::make_CONTEXT_VALUE(*cv, x->loc);
+    }
+    return noise::DocParser::make_NO_COMMA_TEXT(text, x->loc);
+}
+
 %}
 
 %option case-insensitive
@@ -134,17 +156,14 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
 <INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE,PARAM_VALUES_STATE,ARG_VALUES_STATE,LP_STATE,LA_STATE,Q_STRING_STATE,QQ_STRING_STATE>\\(.|\n) {
     if (yytext[1] == '\n') yyextra->loc.lines(1);
     IN_VALUE;
-    return noise::DocParser::make_ESCAPED_CHAR(std::string(1, yytext[1]), yyextra->loc);
+    char c = yytext[1] == '$' ? noise::LITERAL_DOLLAR : yytext[1];
+    return noise::DocParser::make_ESCAPED_CHAR(std::string(1, c), yyextra->loc);
 }
 
  /* -- rules shared by INITIAL and the two "peeking" states -- */
 
-<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>(param|arg)\[[0-9]+\] {
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
-    return TEXT_TOKEN(yytext);
+<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>\$(param|arg)\[[0-9]+\] {
+    return expand_name(yyextra, yytext + 1);
 }
 
 <INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>#(params|args|line|col) {
@@ -157,13 +176,9 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
 
  /* Same lookups, but a value's raw content is a NO_COMMA_TEXT, not a TEXT -
   * balanced_text has no alternative accepting a bare TEXT token. */
-<PARAM_VALUES_STATE,ARG_VALUES_STATE>(param|arg)\[[0-9]+\] {
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>\$(param|arg)\[[0-9]+\] {
     IN_VALUE;
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
-    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+    return value_name(yyextra, yytext);
 }
 
 <PARAM_VALUES_STATE,ARG_VALUES_STATE>#(params|args|line|col) {
@@ -175,15 +190,11 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }
 
-<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>{ID} {
-    if (yyextra->is_macro(yytext)) {
-        return noise::DocParser::make_MACRO(yytext, yyextra->loc);
+<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>\${ID} {
+    if (yyextra->is_macro(yytext + 1)) {
+        return noise::DocParser::make_MACRO(yytext + 1, yyextra->loc);
     }
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
-    return TEXT_TOKEN(yytext);
+    return expand_name(yyextra, yytext + 1);
 }
 
 <INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>\n {
@@ -233,30 +244,18 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
     return TEXT_TOKEN(yytext);
 }
 
-<INITIAL>[^a-zA-Z\n'\"#\\]+ {
+<INITIAL>[^\n'\"#\\$]+ {
     return TEXT_TOKEN(yytext);
 }
-<EXPECT_PARAMS_STATE>[^a-zA-Z\n'\"#<(>),\\]+ {
+<EXPECT_PARAMS_STATE>[^\n'\"#<(>),\\$]+ {
     return TEXT_TOKEN(yytext);
 }
-<EXPECT_ARGS_STATE>[^a-zA-Z\n'\"#(>),\\]+ {
+<EXPECT_ARGS_STATE>[^\n'\"#(>),\\$]+ {
     return TEXT_TOKEN(yytext);
 }
 
- /* The same text runs, but ending in a word glued to a digit or '_' (e.g.
-  * "08b", ".0f", " 2b"): by longest match the whole word stays text, so a
-  * name glued to digits is never a macro/param/variable name - otherwise a
-  * format spec like fmt=08b in a macro with a variable b would become
-  * "08<b's value>" (on every re-expansion round, so no quoting or escape
-  * could protect it). A run with nothing glued is matched by the rules above
-  * just as well, which win the tie as the earlier ones. */
-<INITIAL>[^a-zA-Z\n'\"#\\]*[0-9_][a-zA-Z0-9_]* {
-    return TEXT_TOKEN(yytext);
-}
-<EXPECT_PARAMS_STATE>[^a-zA-Z\n'\"#<(>),\\]*[0-9_][a-zA-Z0-9_]* {
-    return TEXT_TOKEN(yytext);
-}
-<EXPECT_ARGS_STATE>[^a-zA-Z\n'\"#(>),\\]*[0-9_][a-zA-Z0-9_]* {
+ /* A '$' not starting a name ("$5", "US$ 3") is just literal text. */
+<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>\$ {
     return TEXT_TOKEN(yytext);
 }
 
@@ -324,23 +323,20 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }
 
- /* A macro name has no special meaning here: balanced_text only captures
-  * the value's raw text (see the grammar) - any macro call it happens to
-  * contain is recognized and expanded later, when that text is itself
-  * re-expanded (params: right away; args: only once the consuming macro
-  * references them). Only #line/#params-style context lookups still
-  * resolve immediately, since they are simple substitutions, not calls.
-  * A bare name at the head of an item is an ID token (a flag implying
-  * "=true", see the `param`/`arg` grammar) only when it actually names a
-  * BOOL-attributed formal of the macro being called - anything else (not
-  * a context value, not such a formal name) is still just plain text, so
-  * passing a bare word as a positional value is unaffected. */
+ /* Only "$name" is a name. Inside a value it is substituted right away if it
+  * is in scope; otherwise - a macro call, or a name bound only later (e.g. a
+  * foreach loop variable) - it stays raw "$name" text: balanced_text just
+  * captures the value, which is expanded later (params: right away; args:
+  * once the consuming macro references them). A plain name at the head of an
+  * item is an ID token (a flag implying "=true", see the `param`/`arg`
+  * grammar) only when it names a BOOL-attributed formal of the macro being
+  * called; anything else is plain text. */
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>\${ID} {
+    IN_VALUE;
+    return value_name(yyextra, yytext);
+}
+
 <PARAM_VALUES_STATE,ARG_VALUES_STATE>{ID} {
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        IN_VALUE;
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
     if (yyextra->item_head && yyextra->is_bool_formal(yytext)) {
         IN_VALUE;
         return noise::DocParser::make_ID(yytext, yyextra->loc);
@@ -397,12 +393,8 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return noise::DocParser::symbol_type(',', yyextra->loc);
 }
 
-<LP_STATE,LA_STATE>(param|arg)\[[0-9]+\] {
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
-    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+<LP_STATE,LA_STATE>\$(param|arg)\[[0-9]+\] {
+    return value_name(yyextra, yytext);
 }
 
 <LP_STATE,LA_STATE>#(params|args|line|col) {
@@ -413,12 +405,8 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }
 
-<LP_STATE,LA_STATE>{ID} {
-    std::optional<std::string> cv = yyextra->context_value(yytext);
-    if (cv) {
-        return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
-    }
-    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+<LP_STATE,LA_STATE>\${ID} {
+    return value_name(yyextra, yytext);
 }
 
 <LP_STATE,LA_STATE>[\'\"] {
@@ -430,7 +418,11 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }
 
-<LP_STATE,LA_STATE>[^,'\"<>()#\\\n]+ {
+<LP_STATE,LA_STATE>[^,'\"<>()#\\\n$]+ {
+    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+}
+
+<LP_STATE,LA_STATE>\$ {
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }
 
@@ -452,7 +444,12 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return noise::DocParser::symbol_type(')', yyextra->loc);
 }
 
-<PARAM_VALUES_STATE,ARG_VALUES_STATE>[^,'\"=<>()#\\\n \t]+ {
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>[^,'\"=<>()#\\\n \t$]+ {
+    IN_VALUE;
+    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+}
+
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>\$ {
     IN_VALUE;
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
 }

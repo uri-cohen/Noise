@@ -1,10 +1,10 @@
 Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
-1. bits of a number: substr<165, 7, 4, fmt=08b> substr<165, 3, 0, fmt=08b>
-2. a single bit (lsb omitted): substr<165, 0, fmt=08b>
-3. hex digits: substr<48879, 3, 2, fmt=x>
-4. text, from the right: substr<Hello world, 4, 0>
-5. characters, not bytes: substr<héllo, 3, 1>
-6. a real number: substr<3.14159, 3, 0, fmt=.2f>
-7. padded text (escaped >): [substr<abc, 4, 0, fmt=\>5>]
-8. str is expanded first: substr<repeat(text=ab, count=3), 4, 2>
-9. escaped commas: substr<a\, b\, c, 5, 3>
+1. bits of a number: $substr<165, 7, 4, fmt=08b> $substr<165, 3, 0, fmt=08b>
+2. a single bit (lsb omitted): $substr<165, 0, fmt=08b>
+3. hex digits: $substr<48879, 3, 2, fmt=x>
+4. text, from the right: $substr<Hello world, 4, 0>
+5. characters, not bytes: $substr<héllo, 3, 1>
+6. a real number: $substr<3.14159, 3, 0, fmt=.2f>
+7. padded text (escaped >): [$substr<abc, 4, 0, fmt=\>5>]
+8. str is expanded first: $substr<$repeat(text=ab, count=3), 4, 2>
+9. escaped commas: $substr<a\, b\, c, 5, 3>

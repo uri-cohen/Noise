@@ -3,10 +3,10 @@
 macro rand_ints = {
   text = <<EOF
 start #line,#col
-repeat(
-    count=count,
+$repeat(
+    count=$count,
     kws text = "
-    uniform_dist<lb, ub, fmt=.0f> ")
+    $uniform_dist<$lb, $ub, fmt=.0f> ")
 end #line,#col
 EOF
 ;

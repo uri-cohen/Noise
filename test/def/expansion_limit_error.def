@@ -4,6 +4,6 @@
 # CMakeLists.txt), so it is only stable when the limit is raised per scope
 MACRO layered = { TEXT = "\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\x"; };
 MACRO roomy = {
-    TEXT = "layered";
+    TEXT = "$layered";
     PARAMS = { NOISE_MAX_EXPANSIONS = 5; };
 };

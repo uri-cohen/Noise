@@ -2,20 +2,20 @@
 # performance workload (see add_cli_perf_test in CMakeLists.txt): a mix of
 # VARS resolutions of every variable type, invoked 20 times (see in/vars_load.in)
 VARS = { UINT scale; ASSERT scale >= 1 AND scale <= 1000; };
-MACRO ranged = { TEXT = "r"; VARS = { UINT r; ASSERT r >= 10 AND r <= 20; }; };
-MACRO signed = { TEXT = "s"; VARS = { INT s; ASSERT s > -100 AND s < 100 AND s % 7 == 0; }; };
-MACRO fraction = { TEXT = "f"; VARS = { REAL f; ASSERT f > 0 AND f < 1; }; };
+MACRO ranged = { TEXT = "$r"; VARS = { UINT r; ASSERT r >= 10 AND r <= 20; }; };
+MACRO signed = { TEXT = "$s"; VARS = { INT s; ASSERT s > -100 AND s < 100 AND s % 7 == 0; }; };
+MACRO fraction = { TEXT = "$f"; VARS = { REAL f; ASSERT f > 0 AND f < 1; }; };
 MACRO color = {
-    TEXT = "c";
+    TEXT = "$c";
     VARS = { STRING c; ASSERT c == "red" OR c == "green" OR c == "blue"; };
 };
 MACRO pair = {
-    TEXT = "a/b";
+    TEXT = "$a/$b";
     VARS = { BOOL a; BITVEC[8] b; ASSERT a -> b > 128; ASSERT b < (BITVEC[8])200; };
 };
 MACRO bounded = {
-    TEXT = "x";
+    TEXT = "$x";
     PARAMS = { limit = 50; };
     VARS = { INT x, y; ASSERT x < limit AND x > 0; ASSERT y == x * scale; };
 };
-MACRO mix = { TEXT = "ranged signed fraction color pair bounded<limit=30>"; };
+MACRO mix = { TEXT = "$ranged $signed $fraction $color $pair $bounded<limit=30>"; };

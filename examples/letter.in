@@ -1,2 +1,2 @@
-greeting(World)
-greeting<salutation=salutation_pick>(Alice)
+$greeting(World)
+$greeting<salutation=$salutation_pick>(Alice)

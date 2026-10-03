@@ -1,0 +1,11 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# Names are referenced with $; plain words are never replaced. Run with
+# NOISE_SIGIL_GREETING and NOISE_SIGIL_NUM in the environment (CMakeLists.txt).
+VARS = { INT num; ASSERT num == NOISE_SIGIL_NUM; };  # environment in an ASSERT
+MACRO greet = {
+    TEXT = "hi $who (plain who and greet stay words; first param: $param[0])";
+    PARAMS = { who = world; };
+};
+# a literal $name in a macro's output survives its re-expansion (\\$ in a
+# .def, as the .def itself consumes one level of \ escapes)
+MACRO shell = { TEXT = "echo \\$HOME costs \\$5"; };

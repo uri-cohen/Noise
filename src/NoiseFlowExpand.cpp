@@ -8,7 +8,9 @@
 
 #include <NoiseFlow.h>
 #include <DocBuilder.h>
+#include <algorithm>
 #include <iterator>
+#include <sstream>
 
 namespace noise {
 
@@ -16,14 +18,19 @@ int NoiseFlow::expand(std::istream& in, const std::string& top, std::ostream& ou
 {
     std::string text((std::istreambuf_iterator<char>(in)),
                       std::istreambuf_iterator<char>());
-    resolve_globals();
-    return stream_expand(text, top, out);
+    return expand(text, top, out);
 }
 
 int NoiseFlow::expand(const std::string& str, const std::string& top, std::ostream& out)
 {
     resolve_globals();
-    return stream_expand(str, top, out);
+    std::ostringstream expanded;
+    int rc = stream_expand(str, top, expanded);
+    // the final output: escaped "\$"s become '$' (see LITERAL_DOLLAR)
+    std::string text = expanded.str();
+    std::replace(text.begin(), text.end(), LITERAL_DOLLAR, '$');
+    out << text;
+    return rc;
 }
 
 int NoiseFlow::stream_expand(const std::string& text, const std::string& stream_id,

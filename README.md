@@ -17,15 +17,15 @@ $ cat examples/greet.def
 # Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # A greeting with a default or a randomly picked salutation (see README.md)
 MACRO greeting = {
-    TEXT = "salutation, name!";
+    TEXT = "$salutation, $name!";
     PARAMS = { salutation = Hello; };
     ARGS = { required name = ""; };
 };
-MACRO salutation_pick = { TEXT = "select(text=Hello Hi Howdy)"; };
+MACRO salutation_pick = { TEXT = "$select(text=Hello Hi Howdy)"; };
 
 $ cat examples/letter.in
-greeting(World)
-greeting<salutation=salutation_pick>(Alice)
+$greeting(World)
+$greeting<salutation=$salutation_pick>(Alice)
 
 $ noise -d examples/greet.def -s 1 examples/letter.in
 Hello, World!
@@ -73,23 +73,44 @@ to the template files that follow it.
 | `--log-level <level>` | `fatal`, `error`, `warning`, `info`, `debug`, or a number 10-50 |
 
 On an error noise prints a single `Noise-F-...` line to stderr and exits with
-status 1.
+status 1. Warnings (`Noise-W-...`) go to stderr too.
 
 ## Document templates
 
-A template is plain text in which macro calls are expanded; everything else is
+A template is plain text in which `$name`s are expanded; everything else is
 copied to the output as is.
+
+### Names
+
+A name - of a macro, a param or arg, a variable, a [global
+param](#global-params) or an [environment variable](#environment-variables) -
+is used by writing it after a `$`: `$greeting`, `$count`. A plain word is never
+replaced, even if it spells a name, so a template's text needs no care about
+the names that happen to be defined.
+
+`$name` is looked up as a macro first, then among the names in scope, from the
+innermost: the params, args and variables of the macros being expanded, the
+global variables, the `-D` global params and, last, the environment.
+
+- `$` not followed by a name (`$5`, `US$ 3`) is a literal `$`; `\$` writes a
+  literal `$` anywhere (`\$greeting`).
+- A name is the longest identifier after the `$`: `$b2` is the name `b2`.
+- An **unknown name** expands to nothing. At the end of the run noise warns
+  about all of them at once - `3 unknown $names expanded to nothing: $nosuch
+  (x2), $missing` - or, past [`NOISE_MAX_UNKNOWN_WARNING`](#configuration-params)
+  cases, writes each one (`file:line.col $name`) to `noise-unknown.txt` (in the
+  `-o` file's directory, else the current one) and refers to that file.
 
 ### Calling a macro
 
-A macro call is the macro's name, optionally followed by a param list in angle
-brackets and/or an arg list in parentheses:
+A macro call is `$` and the macro's name, optionally followed by a param list
+in angle brackets and/or an arg list in parentheses:
 
 ```
-name
-name<params>
-name(args)
-name<params>(args)
+$name
+$name<params>
+$name(args)
+$name<params>(args)
 ```
 
 **Params** are expanded (their own macro calls resolved) *before* the macro
@@ -101,7 +122,8 @@ comma-separated and may be empty. Each entry has the form
 ```
 
 - An entry with `name=` binds the macro's param/arg of that name; entries
-  without a name bind the remaining ones in order.
+  without a name bind the remaining ones in order. The entry's own name takes
+  no `$`; a value that uses a name does: `$repeat(text=$word, count=3)`.
 - A value runs up to the next unescaped `,` or closing bracket. Nested
   `(...)` and `<...>` groups are kept whole, so `f(a,b)` is one value.
 - Leading and trailing whitespace of a value is trimmed.
@@ -126,14 +148,14 @@ the same as `dups=true`.
 ### Escapes and quotes
 
 `\` makes the next character literal, everywhere in a template: in text, in
-values and in quotes. It is how you write a macro's name as plain text, or a
-`,` inside a value (`\,`). A literal backslash is `\\`. Here `dice` is a
-macro from [`examples/dice.def`](examples/dice.def) (shown in
+values and in quotes. It is how you write a `$` that would start a name
+(`\$`), or a `,` inside a value (`\,`). A literal backslash is `\\`. Here
+`dice` is a macro from [`examples/dice.def`](examples/dice.def) (shown in
 [Variables and constraints](#variables-and-constraints)):
 
 ```
-$ printf '%s\n' '\dice is plain text, dice is not; a literal \\ needs two' | noise -d examples/dice.def -s 1
-dice is plain text, 6 + 5 = 11 is not; a literal \ needs two
+$ printf '%s\n' '\$dice is plain text, $dice is not; a literal \\ needs two' | noise -d examples/dice.def -s 1
+$dice is plain text, 6 + 5 = 11 is not; a literal \ needs two
 ```
 
 Text in `'...'` or `"..."` is never expanded. At document level the quotes are
@@ -144,8 +166,8 @@ kept in the output; inside a param/arg value they just delimit it.
 When a macro is called, its params are expanded first, then all params and
 args (with defaults for any not given) become names in scope, and the
 macro's text is expanded with them. The result is re-expanded until it no
-longer changes - so a macro's output may itself contain macro calls - and
-then replaces the call.
+longer changes - so a macro's output may itself contain `$name`s - and then
+replaces the call.
 
 ## Macro definition files
 
@@ -191,18 +213,17 @@ text = '
 
 ### Inside a macro's text
 
-A macro's params and args are available by name and by position
-(`param[0]`, `arg[1]`, ...). Four read-only values are always available:
+A macro's params and args are available by name and by position - `$count`,
+`$param[0]`, `$arg[1]`, ... Four read-only values are always available, with
+no `$`:
 
 | Name | Value |
 |---|---|
 | `#params`, `#args` | how many params/args the call passed |
 | `#line`, `#col` | where in the output this macro's expansion starts |
 
-Any name in scope is replaced wherever it appears as a word in the text, so
-give params and variables names that won't collide with ordinary words. A word
-glued to a digit or `_` is not a name: with a param `b`, `2b` and `08b` stay
-as they are (and so does a macro name glued that way).
+A `.def` file reads its quoted text with `\` escapes of its own, so a literal
+`$` inside a macro's `TEXT` is written `\\$` there.
 
 ## Builtin macros
 
@@ -245,26 +266,16 @@ applied first: a format spec as for the distributions' `fmt`, used on `str` as
 an integer if it is one (`fmt=08b` for binary digits, `fmt=x` for hex), else
 as a real number, else as text. `str` is a param, so it is expanded first;
 like any value, it needs `\,` for a comma, and `fmt` needs `\<` / `\>` for
-alignment (`fmt=\>8`). Like any macro's output, the result is expanded again:
-a selection that happens to spell a macro or variable name is expanded too.
-
-**A caveat for `fmt` inside macros:** a param's value is expanded until it no
-longer changes, so a name in scope inside it is replaced - quotes and `\`
-protect only the first round. Specs with a width or precision are safe, as a
-word glued to a digit is never a name (`08b`, `.0f`). But a spec that is just a
-letter is a word of its own: with a param or variable `x` in scope, `fmt=x`
-becomes `x`'s value (escaping or quoting it doesn't help). Write such a spec
-with a `0` in front - `fmt=0x`, `fmt=0b`, `fmt=0d`, `fmt=0f`, `fmt=0e`: the `0`
-(zero padding) has no effect without a width, and the spec is now a word glued
-to a digit. This applies to the distributions' `fmt` as well.
+alignment (`fmt=\>8`). Like any macro's output, the result is expanded again,
+so a selection containing `$name` text is expanded too.
 
 ```
-$ echo 'uniform_dist<a=1, b=6, fmt=.0f> | select<count=2>(text=red green blue) | repeat(kws text="ab ", count=3)' | noise -s 3
+$ echo '$uniform_dist<a=1, b=6, fmt=.0f> | $select<count=2>(text=red green blue) | $repeat(kws text="ab ", count=3)' | noise -s 3
 4 | green blue | ab ab ab
-$ echo 'substr<165, 7, 4, fmt=08b> substr<Hello world, 4, 0>' | noise
+$ echo '$substr<165, 7, 4, fmt=08b> $substr<Hello world, 4, 0>' | noise
 1010 world
-$ echo 'foreach<unit=line>(items="apples
-pears", kws text="- item
+$ echo '$foreach<unit=line>(items="apples
+pears", kws text="- $item
 ")' | noise
 - apples
 - pears
@@ -283,21 +294,21 @@ $ cat examples/dice.def
 # Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 # Two dice whose sum is at least 10 (see README.md, Variables and constraints)
 MACRO dice = {
-    TEXT = "a + b = sum";
+    TEXT = "$a + $b = $sum";
     VARS = {
         UINT a, b, sum;
         ASSERT a >= 1 AND a <= 6 AND b >= 1 AND b <= 6;
         ASSERT sum == a + b AND sum >= 10;
     };
 };
-$ for s in 1 2 3; do echo dice | noise -d examples/dice.def -s $s; done
+$ for s in 1 2 3; do echo '$dice' | noise -d examples/dice.def -s $s; done
 6 + 5 = 11
 4 + 6 = 10
 6 + 4 = 10
 ```
 
-Once resolved, variables work like params: their names are replaced by their
-values in the text, and they are visible to macros called from there. An inner
+Once resolved, variables work like params: `$name` gives the value in the
+text, and they are visible to macros called from there. An inner
 scope's variable of the same name hides an outer one.
 
 ### Declarations
@@ -354,12 +365,13 @@ VARS = {
 
 Bit selects exist only in constraints. In a macro's text, `b[0]` is the
 variable's value followed by the text `[0]`; to print some of its bits, use
-[`substr`](#text) on its binary digits - `substr<byte, 7, 4, fmt=08b>` - or
+[`substr`](#text) on its binary digits - `$substr<$byte, 7, 4, fmt=08b>` - or
 give them a variable of their own (`BITVEC[4] high; ASSERT high == byte[7:4];`).
 
-A name is a variable only if it was declared *earlier in the same block*. Any
-other name is looked up among the params, global params and outer variables
-in scope (as a constant), and otherwise read as a string literal. Such values
+Names in constraints take no `$`. A name is a variable only if it was declared
+*earlier in the same block*. Any other name is looked up among the params,
+outer variables, global params and environment variables in scope (as a
+constant), and otherwise read as a string literal. Such values
 and plain literals take the type of what they are combined with. Two
 variables of different types need an explicit cast, e.g. `(UINT)i`.
 
@@ -385,16 +397,33 @@ later definition of a name overrides an earlier one. Values are taken
 literally, not expanded.
 
 ```
-$ echo 'Dear who,' | noise -D who=Bob
+$ echo 'Dear $who,' | noise -D who=Bob
 Dear Bob,
 ```
+
+## Environment variables
+
+Every environment variable whose name is an identifier is in scope too, below
+everything else - so a `-D` param, a variable or a param of the same name hides
+it. `$HOME` in a template is the home directory; an undeclared `LIMIT` in a
+constraint is the environment's `LIMIT` if it is set; and a `NOISE_...`
+[configuration param](#configuration-params) can be set in the environment.
+
+```
+$ echo 'Hello $GREETEE' | GREETEE=world noise
+Hello world
+```
+
+Keep in mind that this makes the output depend on the environment, and lets a
+template (or an included `.def` file) put any environment variable - secrets
+included - into its output.
 
 ## Configuration params
 
 Noise's own limits and tunables are params whose names start with `NOISE_`.
 Like any param, they can be set globally with `-D`, as a macro's param
-default, or at a call (`m<NOISE_MAX_PROBES=0>`), and apply to everything
-expanded within that scope.
+default, at a call (`$m<NOISE_MAX_PROBES=0>`) or in the environment, and apply
+to everything expanded within that scope.
 
 | Param | Default | Meaning |
 |---|---|---|
@@ -402,9 +431,10 @@ expanded within that scope.
 | `NOISE_MAX_EXPANSIONS` | 64 | max times a macro's output is re-expanded before it must stop changing |
 | `NOISE_MAX_PROBES` | 128 | solver checks spent picking one variable's random value; `0` takes the solver's first solution, the same for every seed |
 | `NOISE_REAL_RANGE` | 1e9 | a `REAL` variable is picked within `[-range, range]` |
+| `NOISE_MAX_UNKNOWN_WARNING` | 10 | unknown `$name`s listed in the end-of-run warning itself; more go to a details file |
 
 ```
-$ echo 'dice / dice' | noise -d examples/dice.def -D NOISE_MAX_PROBES=0 -s 1
+$ echo '$dice / $dice' | noise -d examples/dice.def -D NOISE_MAX_PROBES=0 -s 1
 5 + 6 = 11 / 5 + 6 = 11
 ```
 

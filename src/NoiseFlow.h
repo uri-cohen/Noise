@@ -13,6 +13,12 @@ class ContextManager;
 class VarBlock;
 class VarSolver;
 
+/// What an escaped "\$" becomes: a character no expansion round reads as the
+/// start of a $name - a macro's output is re-expanded until stable, which
+/// would otherwise turn a literal "$name" back into a name - and that only
+/// the final output turns back into '$'.
+inline constexpr char LITERAL_DOLLAR = '\x1F';
+
 class NoiseFlow {
   public:
     NoiseFlow(uint64_t seed = 0);
@@ -50,6 +56,17 @@ class NoiseFlow {
     /// visible to every scope below it (the document, macro bodies, VARS
     /// constraints). A later definition of the same name shadows it.
     void define_param(const std::string& name, const std::string& value);
+
+    /// Pushes the process environment (variables whose name is an
+    /// identifier) as a base context - below every -D param and scope.
+    void import_environment();
+
+    /// An unknown $name, expanded to nothing; `where` is "stream:line.col".
+    void record_unknown(const std::string& name, const std::string& where);
+    /// Issues the deferred warning about the unknown $names (if any): a
+    /// summary, or - past NOISE_MAX_UNKNOWN_WARNING cases - a reference to a
+    /// details file, written into details_dir.
+    void report_unknowns(const std::filesystem::path& details_dir);
     void resolve_globals();
 
   private:
@@ -62,6 +79,8 @@ class NoiseFlow {
     std::vector<std::shared_ptr<const VarBlock>> _global_vars;
     bool _globals_resolved = false;
     int64_t _depth = 0;
+    // unknown $names: (name, where), in order of occurrence
+    std::vector<std::pair<std::string, std::string>> _unknowns;
 };
 
 }; // namespace noise

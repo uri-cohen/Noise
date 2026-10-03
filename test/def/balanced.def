@@ -1,13 +1,13 @@
 # Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 macro show_arg = {
-  text = "got=[value]";
+  text = "got=[$value]";
   args = {
     required value = "";
   };
 };
 
 macro show2_args = {
-  text = "first=[arg0] second=[arg1]";
+  text = "first=[$arg0] second=[$arg1]";
   args = {
     required arg0 = "";
     required arg1 = "";
@@ -15,14 +15,14 @@ macro show2_args = {
 };
 
 macro show_param = {
-  text = "got=[myparam]";
+  text = "got=[$myparam]";
   params = {
     required myparam = "";
   };
 };
 
 macro echo_param = {
-  text = "[p]";
+  text = "[$p]";
   params = {
     p = "";
   };
@@ -34,7 +34,7 @@ macro echo_param = {
 # enclosing macro) even though it is just plain text at the point it is
 # first captured - balanced_text must still accept that token.
 macro wrap_deferred = {
-  text = 'repeat(count=2, text = "echo_param<outer>")';
+  text = '$repeat(count=2, text = "$echo_param<$outer>")';
   params = {
     outer = "X";
   };

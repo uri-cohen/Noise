@@ -81,7 +81,7 @@ class Logger {
 #define X(E, L, C, S)                                                       \
     template <typename... Args>                                             \
     inline void E(uint32_t n, std::string_view fmt, Args&&... args) {       \
-        if (!Logger::logger && (L >= int(Logger::Level::LOG_WARNING))) {    \
+        if (!Logger::logger && (L > int(Logger::Level::LOG_WARNING))) {     \
             return;                                                         \
         }                                                                   \
         std::string id(std::format(Q(PROJECT) "-" #C "-{:3}: ", n));        \

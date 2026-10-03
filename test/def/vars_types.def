@@ -1,6 +1,6 @@
 # Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 MACRO types = {
-    TEXT = "i=vi u=vu b=vb bv=vbv r=vr";
+    TEXT = "i=$vi u=$vu b=$vb bv=$vbv r=$vr";
     VARS = {
         INT vi;
         UINT vu;
@@ -15,7 +15,7 @@ MACRO types = {
     };
 };
 MACRO ops = {
-    TEXT = "mod=m shl=s xor=x ushr=ur sshr=sr";
+    TEXT = "mod=$m shl=$s xor=$x ushr=$ur sshr=$sr";
     VARS = {
         INT m, s, x, sr;
         UINT ur;

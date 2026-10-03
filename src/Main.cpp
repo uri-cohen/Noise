@@ -43,7 +43,14 @@ OPTIONS
 class NoiseCmd : public Cmd {
   public:
     NoiseCmd(int argc, char** argv);
-    ~NoiseCmd() {}
+    // Issues the deferred unknown-$name warning: at the end of a run, or
+    // during unwinding before main() logs a fatal error.
+    ~NoiseCmd() {
+        try {
+            _noise_flow.report_unknowns(_out_dir);
+        } catch (...) {
+        }
+    }
 
     int process_in_file(int idx);
     int process_out_file(int idx);
@@ -68,6 +75,8 @@ class NoiseCmd : public Cmd {
     ofstream _out_file;
     // &_out_file or &cout
     ostream* _out_p;
+    // where an unknown-$name details file goes: the -o file's directory
+    path _out_dir{"."};
     string _in_file_name;
 };
 
@@ -76,6 +85,8 @@ class NoiseCmd : public Cmd {
 NoiseCmd::NoiseCmd(int argc, char** argv)
     : Cmd(argc, argv, CB(process_in_file), NOISE_VERSION, NOISE_HELP_HEADER),
       _out_p(&cout) {
+    // the environment is the bottom context layer, below any -D param
+    _noise_flow.import_environment();
     // clang-format off
     add<string>("out-file", 'o', string(""),
         "output file name (empty = stdout)",
@@ -142,6 +153,10 @@ int NoiseCmd::process_out_file(int idx) {
                 "expand_file failed openning output file '{}'", out_file_name));
         }
         _out_p = &_out_file;
+        path dir = path(out_file_name).parent_path();
+        _out_dir = dir.empty() ? path(".") : dir;
+    } else {
+        _out_dir = ".";
     }
     opt->value(out_file_name);
     INFO(402, "setting output file to {}", out_file_name);
