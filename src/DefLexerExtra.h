@@ -9,6 +9,7 @@
 
 #include <Binding.h>
 #include <Vars.h>
+#include <Macro.h>
 #include <def_location.hh>
 
 typedef void* yyscan_t;
@@ -25,7 +26,8 @@ typedef void* yyscan_t;
     X(DEF_VALUE_STATE)   \
     X(INCLUDE_STATE)     \
     X(VARS_STATE)        \
-    X(VAR_VALUE_STATE)
+    X(VAR_VALUE_STATE)   \
+    X(EXPORT_STATE)
 
 #define X(S) void def_push_##S(yyscan_t s);
 PUSH_STATES;
@@ -56,6 +58,10 @@ struct DefLexerExtra {
     bool curr_text_set;
     std::vector<Binding> curr_params;
     std::vector<Binding> curr_args;
+    // the current macro's EXPORT entries, and the one being parsed
+    std::vector<Export> curr_exports;
+    Export curr_export;
+
     // the current macro's VARS (all its VARS clauses accumulate into it)
     std::shared_ptr<VarBlock> curr_macro_vars;
 

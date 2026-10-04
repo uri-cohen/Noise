@@ -19,6 +19,13 @@ enum class BindingAttr : unsigned {
     BOOL = 0x20,
 };
 
+/// How a param/arg is assigned (see bind_list in DocParser.yy):
+/// NORMAL "name = value"; COND "name := value" - only if the name isn't
+/// defined already (else the defined value is kept), and in a definition it
+/// makes every normal assignment by a caller conditional; FORCE "name =!
+/// value" - a caller assigning even if the definition said ":=".
+enum class AssignMode { NORMAL, COND, FORCE };
+
 inline BindingAttr operator|(BindingAttr a, BindingAttr b) {
     return static_cast<BindingAttr>(static_cast<unsigned>(a) |
                                      static_cast<unsigned>(b));
@@ -35,8 +42,9 @@ inline bool has(BindingAttr set, BindingAttr bit) {
 class Binding {
   public:
     Binding(const std::string& name, const std::string& value = "",
-            BindingAttr attrs = BindingAttr::NONE)
-        : _name(name), _value(value), _attrs(attrs) {}
+            BindingAttr attrs = BindingAttr::NONE,
+            AssignMode mode = AssignMode::NORMAL)
+        : _name(name), _value(value), _attrs(attrs), _mode(mode) {}
     Binding() = default;
     Binding(const Binding& o) = default;
 
@@ -47,6 +55,7 @@ class Binding {
     const std::string& name() const { return _name; }
     const std::string& value() const { return _value; }
     BindingAttr attrs() const { return _attrs; }
+    AssignMode mode() const { return _mode; }
 
     bool required() const { return has(_attrs, BindingAttr::REQUIRED); }
     bool quoted() const { return has(_attrs, BindingAttr::QUOTED); }
@@ -60,6 +69,7 @@ class Binding {
     std::string _name;
     std::string _value;
     BindingAttr _attrs = BindingAttr::NONE;
+    AssignMode _mode = AssignMode::NORMAL;
 };
 
 /// @brief Throws NoiseDefBuilderError if a non-required entry precedes a

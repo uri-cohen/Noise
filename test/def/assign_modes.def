@@ -1,0 +1,14 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# "name := value" assigns only if name isn't defined yet (else it inherits the
+# defined value); in a definition, it makes callers' plain "=" conditional;
+# "name =! value" assigns regardless. Run with -D d=42 (CMakeLists.txt).
+MACRO show = { TEXT = "[n=$n]"; PARAMS = { n = 1; }; };
+MACRO inh = { TEXT = "[n=$n]"; PARAMS = { n := 1; }; };
+MACRO probe = { TEXT = "$defined(n)"; };
+MACRO with_n = {
+    TEXT = "plain = $show $show<n=2>; caller := $show<n:=2>; callee := $inh $inh<n=2>; =! $inh<n=!2>; defined(n) $probe";
+    PARAMS = { n = 7; };
+};
+MACRO cnt = { TEXT = "[c=$c]"; ARGS = { c := 0; }; };
+MACRO with_c = { TEXT = "$cnt $cnt(5) $cnt(c=!5)"; PARAMS = { c = 9; }; };
+MACRO inh_d = { TEXT = "[d=$d]"; PARAMS = { d := 1; }; };

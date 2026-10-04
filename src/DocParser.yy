@@ -102,12 +102,23 @@ static void bare_flags(const std::vector<noise::Binding>& formals,
 
 // Expansion Flow step 5: instantiation context mapping shared by every
 // macro type (see NoiseFlow::bind_instance).
+// Assignment modes (noise::AssignMode): a value is assigned conditionally -
+// only if the name isn't defined already (in any outer scope, including -D
+// params and the environment); else the defined value is inherited - when
+// the caller wrote "name := value", or wrote "name = value" (or nothing) for
+// a formal defined with ":="; "name =! value" always assigns. cm sees only
+// the outer scopes, as the new context isn't pushed yet.
 static void bind_list(const std::string& macro_name,
                        const std::vector<noise::Binding>& formals,
                        const std::vector<noise::Binding>& actuals,
-                       const std::string& prefix, noise::Context& ctx) {
+                       const std::string& prefix, noise::Context& ctx,
+                       noise::ContextManager* cm) {
     std::vector<bool> resolved(formals.size(), false);
     std::vector<std::string> values(formals.size());
+    // for a resolved formal, the index of the actual giving it
+    std::vector<size_t> from_actual(formals.size(), 0);
+    // an actual whose value was replaced by an inherited one
+    std::vector<std::optional<std::string>> inherited(actuals.size());
     std::set<std::string> claimed_names;
 
     // A call-site attr (e.g. keep_left_ws on a specific actual) applies
@@ -121,6 +132,7 @@ static void bind_list(const std::string& macro_name,
                 values[i] = apply_attrs(a.value(), formals[i].attrs() | a.attrs(),
                                         formals[i].value());
                 resolved[i] = true;
+                from_actual[i] = static_cast<size_t>(&a - actuals.data());
                 claimed_names.insert(a.name());
                 break;
             }
@@ -137,10 +149,25 @@ static void bind_list(const std::string& macro_name,
             values[i] = apply_attrs(a.value(), formals[i].attrs() | a.attrs(),
                                     formals[i].value());
             resolved[i] = true;
+            from_actual[i] = pos_idx;
             ++pos_idx;
         }
     }
     for (size_t i = 0; i < formals.size(); ++i) {
+        noise::AssignMode mode =
+            resolved[i] ? actuals[from_actual[i]].mode() : noise::AssignMode::NORMAL;
+        bool conditional = mode == noise::AssignMode::COND ||
+                           (mode == noise::AssignMode::NORMAL &&
+                            formals[i].mode() == noise::AssignMode::COND);
+        if (conditional) {
+            if (auto outer = cm->get(formals[i].name())) {
+                values[i] = *outer;
+                if (resolved[i]) {
+                    inherited[from_actual[i]] = *outer;
+                }
+                resolved[i] = true;
+            }
+        }
         if (!resolved[i]) {
             if (formals[i].required()) {
                 throw noise::NoiseMacroCallError(std::format(
@@ -160,10 +187,18 @@ static void bind_list(const std::string& macro_name,
         ctx.add_map(std::format("{}.{}", prefix, formals[i].name()), values[i]);
     }
     for (size_t i = 0; i < actuals.size(); ++i) {
-        std::string v = apply_attrs(actuals[i]);
+        const auto& a = actuals[i];
+        // a named actual of no formal, assigned with ":=": inherits too
+        if (!a.name().empty() && !claimed_names.contains(a.name()) &&
+            a.mode() == noise::AssignMode::COND) {
+            if (auto outer = cm->get(a.name())) {
+                inherited[i] = *outer;
+            }
+        }
+        std::string v = inherited[i] ? *inherited[i] : apply_attrs(a);
         ctx.add_map(std::format("{}[{}]", prefix, i), v);
-        if (!actuals[i].name().empty() && !claimed_names.contains(actuals[i].name())) {
-            ctx.add_map(actuals[i].name(), v);
+        if (!a.name().empty() && !claimed_names.contains(a.name())) {
+            ctx.add_map(a.name(), v);
         }
     }
     ctx.add_map(std::format("#{}s", prefix), std::to_string(actuals.size()));
@@ -177,6 +212,32 @@ struct DepthGuard {
     int64_t& _depth;
 };
 
+// EXPORT: maps each of the macro's exported names in its target scope - while
+// the call's own scope is still there (so a value can use its params and
+// VARS), and before its output is re-expanded (so a call in the output sees
+// the export). An entry naming macros none of which is calling is skipped.
+static void apply_exports(noise::DocLexerExtra* extra, noise::Macro* macro,
+                          noise::ContextManager* cm, int64_t max_expansions) {
+    size_t frame = cm->frame_level();
+    for (const auto& e : macro->exports()) {
+        std::optional<size_t> target;
+        switch (e.scope) {
+        case noise::Export::Scope::CALLER: target = cm->caller_level(); break;
+        case noise::Export::Scope::GLOBAL: target = cm->document_level(); break;
+        case noise::Export::Scope::MACROS: target = cm->macro_level(e.macros); break;
+        }
+        if (!target) {
+            continue;
+        }
+        std::string value =
+            e.value ? extra->owner->expand_until_stable(
+                          *e.value, std::format("export:{}:{}", macro->name(), e.name),
+                          max_expansions)
+                    : cm->get(e.name).value_or("true");
+        cm->export_name(e.name, value, *target, frame);
+    }
+}
+
 static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& name,
                                  std::vector<noise::Binding> params,
                                  std::vector<noise::Binding> args) {
@@ -187,8 +248,8 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     noise::Context ctx;
     bare_flags(macro->params(), params);
     bare_flags(macro->args(), args);
-    bind_list(name, macro->params(), params, "param", ctx);
-    bind_list(name, macro->args(), args, "arg", ctx);
+    bind_list(name, macro->params(), params, "param", ctx, extra->owner->context_manager());
+    bind_list(name, macro->args(), args, "arg", ctx, extra->owner->context_manager());
     ctx.add_map("#line", std::to_string(extra->out_line));
     ctx.add_map("#col", std::to_string(extra->out_col));
     // a run-wide unique invocation number, e.g. for unique labels
@@ -196,6 +257,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 
     noise::ContextManager* cm = extra->owner->context_manager();
     cm->push(std::move(ctx));
+    cm->enter_frame(name, macro->is_builtin());
     // Read once the call's own params are bound, so a call site param
     // (m<NOISE_MAX_DEPTH=...>) already applies to this very call.
     int64_t max_depth = cm->config_int(noise::config::MAX_DEPTH,
@@ -219,9 +281,11 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
         cm->push(std::move(vars_ctx));
     }
     std::string raw = macro->expand(cm);
+    apply_exports(extra, macro, cm, max_expansions);
     if (has_vars) {
         cm->pop();
     }
+    cm->leave_frame();
     cm->pop();
 
     return extra->owner->expand_until_stable(raw, std::format("macro:{}", name), max_expansions);
@@ -244,6 +308,8 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 %token KEEP_ENCLOSING_WS
 %token QUOTED
 %token BOOL
+%token COLON_EQ
+%token FORCE_EQ
 
 %nterm document
 %nterm <std::string> expandable
@@ -254,7 +320,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 %nterm <noise::Binding> param
 %nterm <noise::Binding> arg
 %nterm <noise::BindingAttr> opt_attrs
-%nterm <std::string> opt_id_eq
+%nterm <std::pair<std::string, noise::AssignMode>> opt_id_eq
 %nterm <std::string> balanced_text
 %nterm <std::string> balanced_text_list
 %nterm <std::string> quoted_text
@@ -353,13 +419,14 @@ param:
     opt_attrs opt_id_eq balanced_text {
         int64_t max_expansions = extra->owner->context_manager()->config_int(
             noise::config::MAX_EXPANSIONS, noise::config::MAX_EXPANSIONS_DEFAULT, 1);
-        $$ = noise::Binding($2, extra->owner->expand_until_stable($3, "param", max_expansions), $1);
+        $$ = noise::Binding($2.first, extra->owner->expand_until_stable($3, "param", max_expansions),
+                            $1, $2.second);
     }
     | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;
 
 arg:
-    opt_attrs opt_id_eq balanced_text { $$ = noise::Binding($2, $3, $1); }
+    opt_attrs opt_id_eq balanced_text { $$ = noise::Binding($2.first, $3, $1, $2.second); }
     | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;
 
@@ -377,8 +444,10 @@ opt_attrs:
     ;
 
 opt_id_eq:
-    %empty { $$ = std::string(); }
-    | ID '=' { $$ = $1; }
+    %empty { $$ = {std::string(), noise::AssignMode::NORMAL}; }
+    | ID '=' { $$ = {$1, noise::AssignMode::NORMAL}; }
+    | ID COLON_EQ { $$ = {$1, noise::AssignMode::COND}; }
+    | ID FORCE_EQ { $$ = {$1, noise::AssignMode::FORCE}; }
     ;
 
 /* Captures a param/arg's raw source text verbatim - it does not itself

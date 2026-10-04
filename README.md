@@ -127,6 +127,11 @@ comma-separated and may be empty. Each entry has the form
 - A value runs up to the next unescaped `,` or closing bracket. Nested
   `(...)` and `<...>` groups are kept whole, so `f(a,b)` is one value.
 - Leading and trailing whitespace of a value is trimmed.
+- `name := value` assigns only if `name` isn't defined yet - in a calling
+  macro, as a global variable, `-D` param or environment variable; otherwise
+  the param keeps the defined value. `name =! value` assigns regardless, even
+  where the macro's definition says `:=` (below). A value starting with `!`
+  after a plain `=` is written `name=\!x` or `name= !x`.
 
 **Attrs** modify a single entry (they can also be given on a macro's own
 definition of the param/arg):
@@ -183,6 +188,7 @@ MACRO name = {
     PARAMS = { [attrs] name = value; ... };
     ARGS   = { [attrs] name = value; ... };
     VARS   = { ... };                # see Variables and constraints
+    EXPORT = { name [scope] [= value]; ... };  # see Exporting names
 };
 
 VARS = { ... };                      # global variables
@@ -190,6 +196,12 @@ VARS = { ... };                      # global variables
 
 The `value` of a param/arg is its default. It needs quoting only to contain
 `;`, `#`, a quote, exact leading/trailing whitespace, or several lines.
+
+Defining a param/arg with `:=` instead of `=` - `PARAMS = { count := 10; };` -
+makes it inherit: a caller's `count=5`, or no `count` at all, keeps an already
+defined `count` (and only otherwise assigns 5, or the default 10); a caller's
+`count =! 5` still forces 5.
+
 Quoted text takes three equivalent forms:
 
 ```
@@ -225,6 +237,33 @@ no `$`:
 
 A `.def` file reads its quoted text with `\` escapes of its own, so a literal
 `$` inside a macro's `TEXT` is written `\\$` there.
+
+### Exporting names
+
+A macro's params and variables vanish when its call ends. `EXPORT` lets a call
+leave names behind, in an outer scope, for whatever is expanded there next:
+
+```
+EXPORT = { name [ global | caller | {macro, ...} ] [= value]; ... };
+```
+
+- **The scope** is the caller's by default (`caller`); `global` is the
+  document's, for the rest of the run; `{a, b}` is the innermost calling `a`
+  or `b` - and if neither is calling, the entry is skipped. Builtins (e.g.
+  `foreach`, whose body is expanded inside it) don't count as callers.
+- **The value** is expanded in the exporting call, so it can use its params
+  and variables - `total = $expr<$a + $b>`; without one, the name's current
+  value is exported, or `true` if it has none.
+- The exports happen when the call's text has been expanded - before calls
+  in its output run, so those see them. Any mapping of the name in the scopes
+  between the target and the exporting call is removed.
+
+```
+MACRO loop = { TEXT = "$foreach(items=1 2 3, text=$inc)[count=$count]"; PARAMS = { count = 0; }; };
+MACRO inc  = { TEXT = ""; EXPORT = { count = $expr<$count + 1>; }; };
+```
+
+`$loop` gives `[count=3]`. A name exported twice by one macro is an error.
 
 ## Builtin macros
 
@@ -282,6 +321,7 @@ $ echo '$max<1.50, 007, 3> $min<3, 1.5, 7>' | noise
 | `substr` | `str`, `msb` (both required), `lsb` (`msb`), `fmt` (none) | | characters `msb` down to `lsb` of `str` formatted by `fmt` |
 | `concat` | | any number | its args concatenated: `$arg[0]$arg[1]...` |
 | `ite` | `cond` (required, `bool`) | `then_part`, `else_part` (both empty) | `then_part` if `cond` is true, else `else_part` |
+| `defined` | | `name` (required) | `true` if `name` is defined in any scope, else `false` |
 | `range` | `from` (0), `to`, `step` (1) | | the integers from `from` up to, not including, `to`, space separated |
 
 `concat` glues text without spaces - `$concat(snake, _, case)` is `snake_case`;
@@ -308,6 +348,11 @@ items are those of the result - `$foreach<items=$range<1, 4>>(text=...)` loops
 over `1 2 3`; an arg is split as written, and each chosen item is expanded only
 as part of the output - `$select(text=$a $b $c)` expands just the item it
 picks. With `items` as a param, name `foreach`'s body: `(text=...)`.
+
+`defined` takes the name itself - `$defined(count)`; `$defined($count)` would
+test whether `count`'s value is a name. A name is defined if a calling macro,
+a global variable, a `-D` param or the environment maps it:
+`$ite<$defined(count)>(...)`.
 
 A `unit` is `word`, `line` or `paragraph`. `select` picks each item at most
 once, in random order; `dups` allows repeats (implied when `count` exceeds the

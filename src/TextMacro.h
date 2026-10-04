@@ -17,6 +17,7 @@ class TextMacro : public Macro {
         : Macro(name), _text(text) {}
     ~TextMacro() {}
     std::string expand(ContextManager* context_manager) override;
+    bool is_builtin() const override { return false; }
 
   private:
     const std::string _text;
@@ -57,6 +58,13 @@ class IteMacro : public Macro {
     ~IteMacro() {}
     std::string expand(ContextManager* context_manager) override;
 };  // class IteMacro
+
+class DefinedMacro : public Macro {
+  public:
+    DefinedMacro(NoiseFlow* owner);
+    ~DefinedMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class DefinedMacro
 
 class ConcatMacro : public Macro {
   public:

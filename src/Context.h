@@ -72,6 +72,7 @@ class Context {
     void add_map(const std::string& name, const std::string& value) {
         _locals[name] = value;
     }
+    void remove_map(const std::string& name) { _locals.erase(name); }
 
     const std::map<std::string, std::string>& locals() const { return _locals; }
 
@@ -93,8 +94,40 @@ class ContextManager {
     Context& push(Context&& context);
     Context pop();
     Context& top();
+    /// number of contexts (scope levels) - a context's level is its index
+    size_t depth() const { return _contexts.size(); }
 
+    /// A name's visible value: from the innermost scope that maps it.
     std::optional<const std::string> get(const std::string& name);
+    /// As get(), but ignoring the innermost scope - e.g. for a builtin
+    /// looking past its own invocation's context.
+    std::optional<const std::string> get_outer(const std::string& name);
+    /// Maps name in the innermost scope (adding or replacing its value there).
+    void set_in_top(const std::string& name, const std::string& value);
+
+    // -- macro call frames, for EXPORT. A frame is a macro invocation, at the
+    // level of its params context; contexts above it (its VARS, a foreach's
+    // items) belong to it.
+    /// A macro invocation whose context was just pushed (the top one).
+    void enter_frame(const std::string& macro, bool builtin);
+    void leave_frame();
+    /// The current frame's level.
+    size_t frame_level() const;
+    /// The level an export to the caller goes to: the innermost frame below
+    /// the current one that isn't a builtin's (builtins don't count as
+    /// callers), else the document scope.
+    size_t caller_level() const;
+    /// The innermost frame below the current one of any of `macros` (builtins
+    /// included); none: nullopt.
+    std::optional<size_t> macro_level(const std::vector<std::string>& macros) const;
+    /// The document (global) scope: set when the first template is expanded.
+    void set_document_level(size_t level) { _document_level = level; }
+    size_t document_level() const;
+    /// Maps name to value at level `target` and removes it from the levels
+    /// strictly between `target` and `upto` (the exporting frame), keeping
+    /// those contexts' locals in sync.
+    void export_name(const std::string& name, const std::string& value,
+                     size_t target, size_t upto);
 
     /// The next macro invocation id (#id): 1, 2, 3, ... over the whole run.
     uint64_t next_id() { return ++_last_id; }
@@ -106,10 +139,26 @@ class ContextManager {
     double config_real(const char* name, double dflt, double min);
 
   private:
-    std::map<std::string, std::string> _mapper;
-    std::map<std::string, std::vector<std::string>> _shadows;
+    struct Entry {
+        size_t level;  // index of the context in _contexts
+        std::string value;
+    };
+    // per name, its entries in increasing level order; back() is the
+    // visible one. Kept in sync with the contexts' locals (pop() removes
+    // the entries of the names its context maps).
+    std::map<std::string, std::vector<Entry>> _names;
     std::vector<Context> _contexts;
     uint64_t _last_id = 0;
+
+    struct Frame {
+        std::string macro;
+        size_t level;
+        bool builtin;
+    };
+    std::vector<Frame> _frames;
+    // per macro name, the levels of its active frames (innermost at back)
+    std::map<std::string, std::vector<size_t>> _macro_levels;
+    std::optional<size_t> _document_level;
 };
 
 }; // namespace noise

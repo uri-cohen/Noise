@@ -44,10 +44,11 @@ using std::string;
 %x INCLUDE_STATE
 %x VARS_STATE
 %x VAR_VALUE_STATE
+%x EXPORT_STATE
 
 %%
 
-<INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE,DEF_VALUE_STATE,INCLUDE_STATE,VARS_STATE,VAR_VALUE_STATE>{
+<INITIAL,PARAM_LIST_STATE,ARG_LIST_STATE,DEF_VALUE_STATE,INCLUDE_STATE,VARS_STATE,VAR_VALUE_STATE,EXPORT_STATE>{
 [ \t]+		{ yyextra->loc.step(); }
 \n		    { yyextra->loc.lines(1); yyextra->loc.step(); }
 }
@@ -59,6 +60,7 @@ using std::string;
 <DEF_VALUE_STATE>#.*    {}
 <VARS_STATE>#.*         {}
 <VAR_VALUE_STATE>#.*    {}
+<EXPORT_STATE>#.*       {}
 
 <INITIAL>MACRO  {
     return noise::DefParser::make_MACRO(yyextra->loc);
@@ -77,6 +79,16 @@ using std::string;
 }
 <INITIAL>VARS  {
     return noise::DefParser::make_VARS(yyextra->loc);
+}
+<INITIAL>EXPORT  {
+    return noise::DefParser::make_EXPORT(yyextra->loc);
+}
+
+ /* An EXPORT clause: "name [global | caller | {macro, ...}] [= value];" */
+<EXPORT_STATE>global { return noise::DefParser::make_GLOBAL(yyextra->loc); }
+<EXPORT_STATE>caller { return noise::DefParser::make_CALLER(yyextra->loc); }
+<EXPORT_STATE>[[:alpha:]][[:alnum:]_]* {
+    return noise::DefParser::make_ID(yytext, yyextra->loc);
 }
 
     /* string states are verbatim: each token is one line including its '\n' */
@@ -112,6 +124,7 @@ keep_right_ws|krws { return noise::DefParser::make_KEEP_RIGHT_WS(yyextra->loc); 
 keep_enclosing_ws|kws { return noise::DefParser::make_KEEP_ENCLOSING_WS(yyextra->loc); }
 quoted   { return noise::DefParser::make_QUOTED(yyextra->loc); }
 bool     { return noise::DefParser::make_BOOL(yyextra->loc); }
+":="     { return noise::DefParser::make_COLON_EQ(yyextra->loc); }
 }
 
  /* A param/arg value needs no quoting when it has none of the characters
