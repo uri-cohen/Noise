@@ -1,0 +1,10 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# Two dice whose sum is at least 10 (see README.md, Variables and constraints)
+MACRO dice = {
+    TEXT = "$a + $b = $sum";
+    VARS = {
+        UINT a, b, sum;
+        ASSERT a >= 1 AND a <= 6 AND b >= 1 AND b <= 6;
+        ASSERT sum == a + b AND sum >= 10;
+    };
+};

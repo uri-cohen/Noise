@@ -1,0 +1,11 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. to the caller: $user / top level: $setx x=$x
+2. global, from deep: $deep g=$g
+3. to a named calling macro: $a / not calling, skipped: y=[$y]
+4. no value: $pass n=$n flag=$flag
+5. a computed value: $sum<q=7> total=$total
+6. removed in between: $outer then x=$x
+7. builtins do not count as callers: $loop
+8. a config param: $cfg $range<0, 3>
+9. := inherits an export: $inh $setk $inh
+10. a call in the output sees the export: $emit($show_z)

@@ -1,0 +1,4 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. param bound: $below $below<limit=10>
+2. shadowing: $outer
+3. enclosing scope variable as a constant: $holder

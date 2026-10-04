@@ -1,0 +1,8 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. default: $caller
+2. w/ positional "m1" arg: $caller($m1)
+3. w/ positional "m2" arg: $caller($m2)
+4. w/ positional non-macro arg: $caller(bar)
+5. w/ empty arg: $caller()
+6. w/ named in positional placed: $caller(a="$m1")
+7. w/ named not in positional placed: $caller(b="$m2", a="$m1")

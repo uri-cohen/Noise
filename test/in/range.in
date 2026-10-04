@@ -1,0 +1,7 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. range<to>: [$range<5>] [$range<to=4>]
+2. from, to: [$range<2, 8>] [$range<-3, 3>]
+3. a step: [$range<0, 10, 3>] [$range<-3, 3, 2>]
+4. counting down: [$range<5, 0, -2>] [$range<0, -4, -1>]
+5. empty: [$range<5, 5>] [$range<5, 0>] [$range<0, 5, -1>]
+6. up to NOISE_MAX_RANGE items, set per call: [$range<NOISE_MAX_RANGE=3, 0, 3>]

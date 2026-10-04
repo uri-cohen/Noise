@@ -1,0 +1,6 @@
+BasedOnStyle: Google
+TabWidth: 4
+IndentCaseLabels: true
+IndentWidth: 4
+AccessModifierOffset: -2
+UseTab: Never

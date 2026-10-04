@@ -1,0 +1,12 @@
+src/TAGS
+build/*
+.cache/*
+.pytest_cache/*
+# Emacs undo-tree history files
+*.~undo-tree~
+
+# local launcher of the dev container (a copy is used on the host)
+.claude/emacs-ide
+.vscode
+.devcontainer
+.claude

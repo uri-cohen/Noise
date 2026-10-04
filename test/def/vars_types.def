@@ -1,0 +1,28 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+MACRO types = {
+    TEXT = "i=$vi u=$vu b=$vb bv=$vbv r=$vr";
+    VARS = {
+        INT vi;
+        UINT vu;
+        BOOL vb;
+        BITVEC[4] vbv;
+        REAL vr;
+        ASSERT vi == -8 / 3;
+        ASSERT vu == (UINT)vi >> 60;
+        ASSERT vb == ((BOOL)vu AND NOT (vi > 0));
+        ASSERT vbv == ~(BITVEC[4])vu;
+        ASSERT vr * 4 == (REAL)vi;
+    };
+};
+MACRO ops = {
+    TEXT = "mod=$m shl=$s xor=$x ushr=$ur sshr=$sr";
+    VARS = {
+        INT m, s, x, sr;
+        UINT ur;
+        ASSERT m == -7 % 3;
+        ASSERT s == 3 << 4;
+        ASSERT x == ((12 ^ 10) | 1);
+        ASSERT ur == 0xF0 >> 4;
+        ASSERT sr == -16 >> 2;
+    };
+};

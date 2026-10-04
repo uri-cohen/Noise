@@ -1,0 +1,17 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+
+\uniform_dist<0, "100", fmt=.0f>
+$uniform_dist<0, "100", fmt=.0f>
+
+\repeat(kws text = "*  uniform_dist<1010,1020,fmt=.0f>
+", count=4)
+$repeat(kws text = "*  $uniform_dist<1010,1020,fmt=.0f>
+", count=4)
+
+# foo \rand
+# \rand_ints default 10
+$rand_ints
+
+# \rand_ints with params
+$rand_ints<5, -1, "-50">
+

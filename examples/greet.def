@@ -1,0 +1,8 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# A greeting with a default or a randomly picked salutation (see README.md)
+MACRO greeting = {
+    TEXT = "$salutation, $name!";
+    PARAMS = { salutation = Hello; };
+    ARGS = { required name = ""; };
+};
+MACRO salutation_pick = { TEXT = "$select(text=Hello Hi Howdy)"; };

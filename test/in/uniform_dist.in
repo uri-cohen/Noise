@@ -1,0 +1,6 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. default a=0,b=1,fmt=(empty) gives a raw real number: $uniform_dist
+2. positional a,b with a 2-decimal fmt: $uniform_dist<10, 20, fmt=.2f>
+3. named a=b collapses to a fixed value: $uniform_dist<a=7,b=7,fmt=.0f>
+4. a negative-to-positive range formatted as an integer: $uniform_dist<a=-5,b=5,fmt=.0f>
+5. fmt can pad/align like any std::format spec: $uniform_dist<a=1,b=2,fmt=6.3f>

@@ -1,0 +1,11 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. literal parens, not a macro call: got=[f(a,b)]
+2. literal angles, not a macro call: got=[f<a,b>]
+3. nested literal groups: got=[f(a,g(b,c),d)]
+4. text around a literal group: got=[pre(1,2)post]
+5. nested commas do not split the outer arg list: first=[f(x,y)] second=[g<p,q>]
+6. a real macro call deferred inside an arg still expands: first=[abab] second=[plain]
+7. a real macro call inside a param expands eagerly: got=[abab]
+8. literal parens inside a param value are preserved: got=[f(x,y)]
+9. context value used inside a nested deferred call, in its own param list: [X][X]
+10. same, with the outer param overridden: [5][5]

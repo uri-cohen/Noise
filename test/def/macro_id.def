@@ -1,0 +1,5 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# #id: a run-wide unique invocation number (1, 2, 3, ... in the order
+# invocations start), e.g. for unique labels
+MACRO label = { TEXT = "L#id"; };
+MACRO section = { TEXT = "[section #id: $label, $label]"; };

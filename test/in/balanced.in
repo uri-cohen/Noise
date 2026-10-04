@@ -1,0 +1,11 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. literal parens, not a macro call: $show_arg(value = f(a,b))
+2. literal angles, not a macro call: $show_arg(value = f<a,b>)
+3. nested literal groups: $show_arg(value = f(a,g(b,c),d))
+4. text around a literal group: $show_arg(value = pre(1,2)post)
+5. nested commas do not split the outer arg list: $show2_args(arg0=f(x,y),arg1=g<p,q>)
+6. a real macro call deferred inside an arg still expands: $show2_args(arg0=$repeat(text=ab,count=2),arg1=plain)
+7. a real macro call inside a param expands eagerly: $show_param<myparam=$repeat(text=ab,count=2)>
+8. literal parens inside a param value are preserved: $show_param<myparam=f(x,y)>
+9. context value used inside a nested deferred call, in its own param list: $wrap_deferred
+10. same, with the outer param overridden: $wrap_deferred<5>
