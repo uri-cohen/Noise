@@ -86,6 +86,8 @@ class NoiseFlow {
     std::vector<std::shared_ptr<const VarBlock>> _global_vars;
     bool _globals_resolved = false;
     int64_t _depth = 0;
+    // the level of the context holding the latest -D params (none: -1)
+    size_t _define_level = static_cast<size_t>(-1);
     // unknown $names: (name, where), in order of occurrence
     std::vector<std::pair<std::string, std::string>> _unknowns;
 };

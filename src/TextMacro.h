@@ -58,6 +58,13 @@ class IteMacro : public Macro {
     std::string expand(ContextManager* context_manager) override;
 };  // class IteMacro
 
+class DefinedMacro : public Macro {
+  public:
+    DefinedMacro(NoiseFlow* owner);
+    ~DefinedMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class DefinedMacro
+
 class ConcatMacro : public Macro {
   public:
     ConcatMacro(NoiseFlow* owner);

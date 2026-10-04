@@ -292,8 +292,8 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
 [ \t\n]+/kws               { WS_BEFORE_HEAD_TOKEN; }
 [ \t\n]+/quoted            { WS_BEFORE_HEAD_TOKEN; }
 [ \t\n]+/bool              { WS_BEFORE_HEAD_TOKEN; }
-[ \t\n]+/{ID}[ \t\n]*=     { WS_BEFORE_HEAD_TOKEN; }
-[ \t\n]+/= {
+[ \t\n]+/{ID}[ \t\n]*:?=   { WS_BEFORE_HEAD_TOKEN; }
+[ \t\n]+/:?= {
     for (int i = 0; i < yyleng; ++i) if (yytext[i] == '\n') yyextra->loc.lines(1);
     if (yyextra->after_id) { yyextra->loc.step(); }
     else { IN_VALUE; return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc); }
@@ -325,7 +325,7 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
 }
 }
 
-<PARAM_VALUES_STATE,ARG_VALUES_STATE>{ID}/[ \t\n]*= {
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>{ID}/[ \t\n]*:?= {
     if (yyextra->item_head) {
         yyextra->item_head = false;
         yyextra->after_id = true;
@@ -367,6 +367,27 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     if (yyextra->after_id) {
         yyextra->after_id = false;
         return noise::DocParser::symbol_type('=', yyextra->loc);
+    }
+    IN_VALUE;
+    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+}
+
+ /* "name := value" (assign only if name isn't defined yet) and "name =!
+  * value" (assign even if the definition says ":=") - right after an entry's
+  * name; elsewhere just value text. A value starting with '!' after a plain
+  * '=' is written "=\!..." or "= !...". */
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>:= {
+    if (yyextra->after_id) {
+        yyextra->after_id = false;
+        return noise::DocParser::make_COLON_EQ(yyextra->loc);
+    }
+    IN_VALUE;
+    return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);
+}
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>=! {
+    if (yyextra->after_id) {
+        yyextra->after_id = false;
+        return noise::DocParser::make_FORCE_EQ(yyextra->loc);
     }
     IN_VALUE;
     return noise::DocParser::make_NO_COMMA_TEXT(yytext, yyextra->loc);

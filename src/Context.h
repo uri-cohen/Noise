@@ -93,8 +93,16 @@ class ContextManager {
     Context& push(Context&& context);
     Context pop();
     Context& top();
+    /// number of contexts (scope levels) - a context's level is its index
+    size_t depth() const { return _contexts.size(); }
 
+    /// A name's visible value: from the innermost scope that maps it.
     std::optional<const std::string> get(const std::string& name);
+    /// As get(), but ignoring the innermost scope - e.g. for a builtin
+    /// looking past its own invocation's context.
+    std::optional<const std::string> get_outer(const std::string& name);
+    /// Maps name in the innermost scope (adding or replacing its value there).
+    void set_in_top(const std::string& name, const std::string& value);
 
     /// The next macro invocation id (#id): 1, 2, 3, ... over the whole run.
     uint64_t next_id() { return ++_last_id; }
@@ -106,8 +114,14 @@ class ContextManager {
     double config_real(const char* name, double dflt, double min);
 
   private:
-    std::map<std::string, std::string> _mapper;
-    std::map<std::string, std::vector<std::string>> _shadows;
+    struct Entry {
+        size_t level;  // index of the context in _contexts
+        std::string value;
+    };
+    // per name, its entries in increasing level order; back() is the
+    // visible one. Kept in sync with the contexts' locals (pop() removes
+    // the entries of the names its context maps).
+    std::map<std::string, std::vector<Entry>> _names;
     std::vector<Context> _contexts;
     uint64_t _last_id = 0;
 };

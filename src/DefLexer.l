@@ -112,6 +112,7 @@ keep_right_ws|krws { return noise::DefParser::make_KEEP_RIGHT_WS(yyextra->loc); 
 keep_enclosing_ws|kws { return noise::DefParser::make_KEEP_ENCLOSING_WS(yyextra->loc); }
 quoted   { return noise::DefParser::make_QUOTED(yyextra->loc); }
 bool     { return noise::DefParser::make_BOOL(yyextra->loc); }
+":="     { return noise::DefParser::make_COLON_EQ(yyextra->loc); }
 }
 
  /* A param/arg value needs no quoting when it has none of the characters

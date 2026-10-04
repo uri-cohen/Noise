@@ -110,6 +110,7 @@ void finalize(noise::DefLexerExtra* extra) {
 %token KEEP_ENCLOSING_WS
 %token QUOTED
 %token BOOL
+%token COLON_EQ
 %token VARS
 %token INT_T
 %token UINT_T
@@ -160,6 +161,7 @@ void finalize(noise::DefLexerExtra* extra) {
 %nterm param_list
 %nterm arg_list
 %nterm <noise::BindingAttr> attrs
+%nterm <noise::AssignMode> assign_op
 %nterm var_items
 %nterm var_decl_list
 %nterm var_decl
@@ -387,22 +389,30 @@ any_string:
 
 param_list:
     %empty
-    | param_list attrs ID '=' {
+    | param_list attrs ID assign_op {
           def_push_DEF_VALUE_STATE(yyscanner);
       } value ';' {
           def_pop_state(yyscanner);
-          extra->curr_params.emplace_back($3, $6, $2);
+          extra->curr_params.emplace_back($3, $6, $2, $4);
       }
     ;
 
 arg_list:
     %empty
-    | arg_list attrs ID '=' {
+    | arg_list attrs ID assign_op {
           def_push_DEF_VALUE_STATE(yyscanner);
       } value ';' {
           def_pop_state(yyscanner);
-          extra->curr_args.emplace_back($3, $6, $2);
+          extra->curr_args.emplace_back($3, $6, $2, $4);
       }
+    ;
+
+/* "name := value" in a definition: every caller's normal assignment of it is
+ * conditional - done only if the name isn't defined already (see bind_list in
+ * DocParser.yy); a caller's "=!" still forces it. */
+assign_op:
+    '='        { $$ = noise::AssignMode::NORMAL; }
+    | COLON_EQ { $$ = noise::AssignMode::COND; }
     ;
 
 /* A value needs quoting only when it actually requires it (to hold ';', '#',

@@ -351,4 +351,19 @@ string RangeMacro::expand(ContextManager* context_manager) {
     return out.str();
 }
 
+// defined(name): "true" if name is mapped in any scope (a param, arg or
+// variable of a calling macro, a global variable, a -D param or an
+// environment variable), else "false". Write the name itself - $defined(x),
+// not $defined($x), which tests the name x's value is.
+DefinedMacro::DefinedMacro(NoiseFlow* owner) : Macro("defined") {
+    set_owner(owner);
+    add_arg(Binding("name", "", BindingAttr::REQUIRED));
+}
+
+string DefinedMacro::expand(ContextManager* context_manager) {
+    string name = trim(context_manager->get("name").value_or(""));
+    // skip this invocation's own scope - it maps "name", "arg[0]", "#id"...
+    return context_manager->get_outer(name) ? "true" : "false";
+}
+
 };  // namespace noise

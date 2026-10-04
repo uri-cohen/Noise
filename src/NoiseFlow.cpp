@@ -31,6 +31,7 @@ NoiseFlow::NoiseFlow(uint64_t seed)
     add_macro(new SubstrMacro(this));
     add_macro(new ConcatMacro(this));
     add_macro(new IteMacro(this));
+    add_macro(new DefinedMacro(this));
     add_macro(new RangeMacro(this));
     add_macro(new ExprMacro(this));
     add_macro(new MinMaxMacro(this, true));
@@ -124,9 +125,14 @@ void NoiseFlow::define_param(const std::string& name, const std::string& value)
         throw NoiseValueError(
             format("invalid global param name '{}' (expected an identifier)", name));
     }
-    Context ctx;
-    ctx.add_map(name, value);
-    _context_manager->push(std::move(ctx));
+    // Consecutive -Ds share one layer; a -D after the top layer stopped
+    // being theirs (e.g. global VARS were resolved above it once a template
+    // was expanded) starts a new layer, which must shadow everything below.
+    if (_define_level != _context_manager->depth() - 1) {
+        _context_manager->push(Context());
+        _define_level = _context_manager->depth() - 1;
+    }
+    _context_manager->set_in_top(name, value);
 }
 
 void NoiseFlow::import_environment()
