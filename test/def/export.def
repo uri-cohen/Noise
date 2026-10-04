@@ -1,0 +1,21 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# EXPORT = { name [global | caller | {macro, ...}] [= value]; ... };
+# maps names in an outer scope when a call's body is expanded
+MACRO setx = { TEXT = ""; EXPORT = { x = 5; }; };
+MACRO user = { TEXT = "[$setx x=$x]"; };
+MACRO deep = { TEXT = "$deeper"; };
+MACRO deeper = { TEXT = ""; EXPORT = { g global = deep; }; };
+MACRO a = { TEXT = "a($b) a:x=$x"; };
+MACRO b = { TEXT = "b($c) b:x=$x"; };
+MACRO c = { TEXT = "c"; EXPORT = { x {a} = from_c; y {zzz} = never; }; };
+MACRO pass = { TEXT = ""; PARAMS = { n = 3; }; EXPORT = { n; flag; }; };
+MACRO sum = { TEXT = ""; PARAMS = { p = 2; q = 3; }; EXPORT = { total = $expr<$p * $q>; }; };
+MACRO outer = { TEXT = "outer:x=$x $clobber outer:x=$x"; PARAMS = { x = 1; }; };
+MACRO clobber = { TEXT = ""; EXPORT = { x global = clobbered; }; };
+MACRO loop = { TEXT = "$foreach(items=1 2 3, text=$inc)[count=$count]"; PARAMS = { count = 0; }; };
+MACRO inc = { TEXT = ""; EXPORT = { count = $expr<$count + 1>; }; };
+MACRO cfg = { TEXT = ""; EXPORT = { NOISE_MAX_RANGE global = 3; }; };
+MACRO inh = { TEXT = "[k=$k]"; PARAMS = { k := default; }; };
+MACRO setk = { TEXT = ""; EXPORT = { k = exported; }; };
+MACRO show_z = { TEXT = "[z=$z]"; };
+MACRO emit = { TEXT = "$arg[0]"; ARGS = { body = ""; }; EXPORT = { z = 1; }; };

@@ -212,6 +212,32 @@ struct DepthGuard {
     int64_t& _depth;
 };
 
+// EXPORT: maps each of the macro's exported names in its target scope - while
+// the call's own scope is still there (so a value can use its params and
+// VARS), and before its output is re-expanded (so a call in the output sees
+// the export). An entry naming macros none of which is calling is skipped.
+static void apply_exports(noise::DocLexerExtra* extra, noise::Macro* macro,
+                          noise::ContextManager* cm, int64_t max_expansions) {
+    size_t frame = cm->frame_level();
+    for (const auto& e : macro->exports()) {
+        std::optional<size_t> target;
+        switch (e.scope) {
+        case noise::Export::Scope::CALLER: target = cm->caller_level(); break;
+        case noise::Export::Scope::GLOBAL: target = cm->document_level(); break;
+        case noise::Export::Scope::MACROS: target = cm->macro_level(e.macros); break;
+        }
+        if (!target) {
+            continue;
+        }
+        std::string value =
+            e.value ? extra->owner->expand_until_stable(
+                          *e.value, std::format("export:{}:{}", macro->name(), e.name),
+                          max_expansions)
+                    : cm->get(e.name).value_or("true");
+        cm->export_name(e.name, value, *target, frame);
+    }
+}
+
 static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& name,
                                  std::vector<noise::Binding> params,
                                  std::vector<noise::Binding> args) {
@@ -231,6 +257,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
 
     noise::ContextManager* cm = extra->owner->context_manager();
     cm->push(std::move(ctx));
+    cm->enter_frame(name, macro->is_builtin());
     // Read once the call's own params are bound, so a call site param
     // (m<NOISE_MAX_DEPTH=...>) already applies to this very call.
     int64_t max_depth = cm->config_int(noise::config::MAX_DEPTH,
@@ -254,9 +281,11 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
         cm->push(std::move(vars_ctx));
     }
     std::string raw = macro->expand(cm);
+    apply_exports(extra, macro, cm, max_expansions);
     if (has_vars) {
         cm->pop();
     }
+    cm->leave_frame();
     cm->pop();
 
     return extra->owner->expand_until_stable(raw, std::format("macro:{}", name), max_expansions);

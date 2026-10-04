@@ -146,6 +146,8 @@ add_cli_test(expr)
 add_cli_error_test(expr_error)
 add_cli_test(minmax)
 add_cli_test(assign_modes -D d=42)
+add_cli_warning_test(export)
+add_cli_error_test(export_twice)
 add_cli_test(global_params -D who=world -D level=3 --define=flag -D who=everyone)
 
 # ~0.6s on a current machine (unoptimized build)

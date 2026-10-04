@@ -56,6 +56,7 @@ void begin_macro(noise::DefLexerExtra* extra, const std::string& name) {
     extra->curr_params.clear();
     extra->curr_args.clear();
     extra->curr_macro_vars.reset();
+    extra->curr_exports.clear();
 }
 
 void end_macro(noise::DefLexerExtra* extra) {
@@ -63,7 +64,8 @@ void end_macro(noise::DefLexerExtra* extra) {
         throw noise::NoiseDefBuilderError(
             std::format("macro '{}' missing TEXT", extra->curr_name));
     }
-    auto* m = new noise::TextMacro(extra->curr_name, extra->curr_text);
+    // owned here until stored: add_param/add_arg/add_export may throw
+    auto m = std::make_unique<noise::TextMacro>(extra->curr_name, extra->curr_text);
     for (auto& p : extra->curr_params) {
         m->add_param(p);
     }
@@ -71,7 +73,10 @@ void end_macro(noise::DefLexerExtra* extra) {
         m->add_arg(a);
     }
     m->set_vars(extra->curr_macro_vars);
-    extra->macro_list.push_back(m);
+    for (auto& e : extra->curr_exports) {
+        m->add_export(e);
+    }
+    extra->macro_list.push_back(m.release());
 }
 
 static noise::ExprPtr binary(noise::Expr::Op op, noise::ExprPtr a, noise::ExprPtr b) {
@@ -112,6 +117,9 @@ void finalize(noise::DefLexerExtra* extra) {
 %token BOOL
 %token COLON_EQ
 %token VARS
+%token EXPORT
+%token GLOBAL
+%token CALLER
 %token INT_T
 %token UINT_T
 %token REAL_T
@@ -229,6 +237,11 @@ macro_body:
       } '{' arg_list '}' ';' {
           def_pop_state(yyscanner);
       }
+    | macro_body EXPORT '=' {
+          def_push_EXPORT_STATE(yyscanner);
+      } '{' export_list '}' ';' {
+          def_pop_state(yyscanner);
+      }
     | macro_body VARS '=' {
           def_push_VARS_STATE(yyscanner);
           if (!extra->curr_macro_vars) {
@@ -238,6 +251,40 @@ macro_body:
       } '{' var_items '}' ';' {
           def_pop_state(yyscanner);
           extra->curr_vars.reset();
+      }
+    ;
+
+export_list:
+    %empty
+    | export_list ID {
+          extra->curr_export = noise::Export{};
+          extra->curr_export.name = $2;
+      } export_scope export_value ';' {
+          extra->curr_exports.push_back(extra->curr_export);
+      }
+    ;
+
+/* none: the caller's scope */
+export_scope:
+    %empty
+    | CALLER { extra->curr_export.scope = noise::Export::Scope::CALLER; }
+    | GLOBAL { extra->curr_export.scope = noise::Export::Scope::GLOBAL; }
+    | '{' { extra->curr_export.scope = noise::Export::Scope::MACROS; } export_macros '}'
+    ;
+
+export_macros:
+    ID { extra->curr_export.macros.push_back($1); }
+    | export_macros ',' ID { extra->curr_export.macros.push_back($3); }
+    ;
+
+/* none: the name's current value (in the exporting call), else "true" */
+export_value:
+    %empty
+    | '=' {
+          def_push_DEF_VALUE_STATE(yyscanner);
+      } value {
+          def_pop_state(yyscanner);
+          extra->curr_export.value = $3;
       }
     ;
 

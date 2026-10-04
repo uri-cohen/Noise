@@ -3,6 +3,7 @@
 #include <NoiseFlow.h>
 #include <Binding.h>
 #include <Macro.h>
+#include <Exception.h>
 #include <Vars.h>
 
 namespace noise {
@@ -31,5 +32,16 @@ void Macro::add_arg(const Binding& arg)
 }
 
 std::mt19937_64& Macro::gen() { return _owner->gen(); }
+
+void Macro::add_export(const Export& e)
+{
+    for (const auto& x : _exports) {
+        if (x.name == e.name) {
+            throw NoiseDefBuilderError(std::format(
+                "macro '{}' exports '{}' twice", _name, e.name));
+        }
+    }
+    _exports.push_back(e);
+}
 
 }; // namespace noise

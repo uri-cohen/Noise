@@ -188,6 +188,7 @@ MACRO name = {
     PARAMS = { [attrs] name = value; ... };
     ARGS   = { [attrs] name = value; ... };
     VARS   = { ... };                # see Variables and constraints
+    EXPORT = { name [scope] [= value]; ... };  # see Exporting names
 };
 
 VARS = { ... };                      # global variables
@@ -236,6 +237,33 @@ no `$`:
 
 A `.def` file reads its quoted text with `\` escapes of its own, so a literal
 `$` inside a macro's `TEXT` is written `\\$` there.
+
+### Exporting names
+
+A macro's params and variables vanish when its call ends. `EXPORT` lets a call
+leave names behind, in an outer scope, for whatever is expanded there next:
+
+```
+EXPORT = { name [ global | caller | {macro, ...} ] [= value]; ... };
+```
+
+- **The scope** is the caller's by default (`caller`); `global` is the
+  document's, for the rest of the run; `{a, b}` is the innermost calling `a`
+  or `b` - and if neither is calling, the entry is skipped. Builtins (e.g.
+  `foreach`, whose body is expanded inside it) don't count as callers.
+- **The value** is expanded in the exporting call, so it can use its params
+  and variables - `total = $expr<$a + $b>`; without one, the name's current
+  value is exported, or `true` if it has none.
+- The exports happen when the call's text has been expanded - before calls
+  in its output run, so those see them. Any mapping of the name in the scopes
+  between the target and the exporting call is removed.
+
+```
+MACRO loop = { TEXT = "$foreach(items=1 2 3, text=$inc)[count=$count]"; PARAMS = { count = 0; }; };
+MACRO inc  = { TEXT = ""; EXPORT = { count = $expr<$count + 1>; }; };
+```
+
+`$loop` gives `[count=3]`. A name exported twice by one macro is an error.
 
 ## Builtin macros
 

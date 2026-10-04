@@ -214,6 +214,9 @@ void NoiseFlow::resolve_globals()
         }
         _context_manager->push(std::move(ctx));
     }
+    // the document (global) scope: where EXPORT ... global maps names
+    _context_manager->push(Context());
+    _context_manager->set_document_level(_context_manager->depth() - 1);
 }
 
 } // namespace noise

@@ -120,4 +120,86 @@ double ContextManager::config_real(const char* name, double dflt, double min)
     return out;
 }
 
+void ContextManager::enter_frame(const std::string& macro, bool builtin)
+{
+    size_t level = _contexts.size() - 1;
+    _frames.push_back(Frame{macro, level, builtin});
+    _macro_levels[macro].push_back(level);
+}
+
+void ContextManager::leave_frame()
+{
+    if (_frames.empty())
+        throw NoiseInternalError("leave_frame() without a frame");
+    auto it = _macro_levels.find(_frames.back().macro);
+    it->second.pop_back();
+    if (it->second.empty()) {
+        _macro_levels.erase(it);
+    }
+    _frames.pop_back();
+}
+
+size_t ContextManager::frame_level() const
+{
+    if (_frames.empty())
+        throw NoiseInternalError("frame_level() without a frame");
+    return _frames.back().level;
+}
+
+size_t ContextManager::caller_level() const
+{
+    for (size_t i = _frames.size() - 1; i-- > 0;) {
+        if (!_frames[i].builtin) {
+            return _frames[i].level;
+        }
+    }
+    return document_level();
+}
+
+std::optional<size_t> ContextManager::macro_level(const std::vector<std::string>& macros) const
+{
+    size_t current = frame_level();
+    std::optional<size_t> best;
+    for (const auto& m : macros) {
+        auto it = _macro_levels.find(m);
+        if (it == _macro_levels.end()) continue;
+        for (auto l = it->second.rbegin(); l != it->second.rend(); ++l) {
+            if (*l < current) {
+                if (!best || *l > *best) best = *l;
+                break;
+            }
+        }
+    }
+    return best;
+}
+
+size_t ContextManager::document_level() const
+{
+    if (!_document_level)
+        throw NoiseInternalError("no document scope yet");
+    return *_document_level;
+}
+
+void ContextManager::export_name(const std::string& name, const std::string& value,
+                                 size_t target, size_t upto)
+{
+    auto& entries = _names[name];
+    // drop the name from the scopes in between (and from their contexts)
+    std::erase_if(entries, [&](const Entry& e) {
+        if (e.level > target && e.level < upto) {
+            _contexts[e.level].remove_map(name);
+            return true;
+        }
+        return false;
+    });
+    _contexts[target].add_map(name, value);
+    auto pos = std::find_if(entries.begin(), entries.end(),
+                            [&](const Entry& e) { return e.level >= target; });
+    if (pos != entries.end() && pos->level == target) {
+        pos->value = value;
+    } else {
+        entries.insert(pos, Entry{target, value});
+    }
+}
+
 } // namespace noise
