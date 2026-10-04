@@ -1,0 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# expr<str, fmt>: str evaluated as a numeric expression (VARS constraint
+# operators and precedence; int64 integers or reals); < and > need \< \>
+MACRO area = { TEXT = "$expr<$w * $h>"; PARAMS = { w = 3; h = 4; }; };

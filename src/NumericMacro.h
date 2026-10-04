@@ -45,4 +45,20 @@ class PoissonDistMacro : public Macro {
     std::string expand(ContextManager* context_manager) override;
 };  // class PoissonDistMacro
 
+class ExprMacro : public Macro {
+  public:
+    ExprMacro(NoiseFlow* owner);
+    std::string expand(ContextManager* context_manager) override;
+};  // class ExprMacro
+
+// min<params...> / max<params...>
+class MinMaxMacro : public Macro {
+  public:
+    MinMaxMacro(NoiseFlow* owner, bool is_min);
+    std::string expand(ContextManager* context_manager) override;
+
+  private:
+    bool _is_min;
+};  // class MinMaxMacro
+
 };  // namespace noise

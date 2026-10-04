@@ -76,6 +76,8 @@ add_library(noise_core SHARED
     NoiseFlow.cpp
     NoiseFlow.h
     NoiseFlowExpand.cpp
+    NumExpr.cpp
+    NumExpr.h
     NumericMacro.cpp
     NumericMacro.h
     TextMacro.cpp
