@@ -8,3 +8,5 @@ Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 7. dups=false (default) never repeats when count fits: a d e
 8. an invalid bool value warns and falls back to the default: b c
 9. a plain bare word is still a positional value, not a flag: [hello]
+9. text as a param is expanded before splitting: 0 6 7
+10. a bare flag after a space: b c c

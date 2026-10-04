@@ -9,3 +9,4 @@ Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 still first]>
 <[second para]>
 
+5. items as a param are expanded before splitting: <1><2><3>

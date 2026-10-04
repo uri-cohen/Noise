@@ -107,7 +107,8 @@ class VarBlock {
     std::set<std::string> _names;
 };
 
-/// Case insensitive boolean spellings (same as the "bool" param attr).
+/// Case insensitive boolean spellings - for BOOL variables and "bool" params
+/// alike: true, t, yes, y, 1, ok, on / false, f, no, n, 0, off.
 std::optional<bool> parse_bool(const std::string& text);
 
 /// @brief Parses text as a value of the given type.

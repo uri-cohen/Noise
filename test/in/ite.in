@@ -1,0 +1,8 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. bool spellings: [$ite<true>(yes, no)] [$ite<0>(yes, no)] [$ite<YES>(yes, no)] [$ite<on>(yes, no)] [$ite<Off>(yes, no)]
+2. a missing part is empty: [$ite<yes>(only then)] [$ite<no>(only then)]
+3. only the chosen part is expanded: $ite<false>($label, skipped) $label, $ite<true>($label, $nosuch) $label
+4. nested: $ite<1>($ite<0>(a, b), c)
+5. cond from a BOOL variable: $size
+6. cond from a param: $greet / $greet<formal, who=Sir>
+7. an invalid cond warns and counts as false: [$ite<maybe>(yes, no)]

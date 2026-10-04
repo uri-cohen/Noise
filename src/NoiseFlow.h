@@ -35,6 +35,13 @@ class NoiseFlow {
     int expand(const std::string& str, const std::string& top, std::ostream& out);
     int stream_expand(const std::string& text, const std::string& stream_id,
                        std::ostream& out);
+    /// Expansion Flow steps 7-8: re-expands `text` as a fresh document,
+    /// repeating until the output stops changing; throws if it doesn't within
+    /// max_expansions (NOISE_MAX_EXPANSIONS) rounds. Used for a macro's own
+    /// body, for a param's value, and by builtins expanding an arg's text.
+    std::string expand_until_stable(const std::string& text,
+                                    const std::string& stream_id,
+                                    int64_t max_expansions);
     void add_macro(Macro* macro);
     Macro* find_macro(const std::string& id) const;
     std::mt19937_64& gen() { return _gen; }

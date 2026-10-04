@@ -7,6 +7,7 @@
 // live in NoiseFlow.cpp; the doc-expansion ones live here.
 
 #include <NoiseFlow.h>
+#include <Exception.h>
 #include <DocBuilder.h>
 #include <algorithm>
 #include <iterator>
@@ -38,6 +39,29 @@ int NoiseFlow::stream_expand(const std::string& text, const std::string& stream_
 {
     DocBuilder builder(this, stream_id, out);
     return builder.parse(text);
+}
+
+std::string NoiseFlow::expand_until_stable(const std::string& text,
+                                           const std::string& stream_id,
+                                           int64_t max_expansions)
+{
+    std::string prev = text, curr;
+    int64_t iterations = 0;
+    do {
+        std::ostringstream tmp;
+        stream_expand(prev, stream_id, tmp);
+        curr = tmp.str();
+        if (curr == prev) {
+            break;
+        }
+        prev = curr;
+    } while (++iterations < max_expansions);
+    if (iterations >= max_expansions) {
+        throw NoiseMacroCallError(std::format(
+            "possible infinite expansion while expanding '{}' - not stable "
+            "after NOISE_MAX_EXPANSIONS={} re-expansions", stream_id, max_expansions));
+    }
+    return prev;
 }
 
 } // namespace noise

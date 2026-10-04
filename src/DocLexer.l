@@ -43,6 +43,18 @@ using std::string;
 
 #define yyterminate() return noise::DocParser::make_END_OF_FILE(yyextra->loc)
 
+/* The variable trailing context rules (e.g. "[ \t\n]+/{ID}[ \t\n]*=") make
+ * flex record states in yy_state_buf while matching a token: the start state,
+ * then one per character read - which, for a token running to the end of the
+ * text, includes the two end-of-buffer sentinels yy_scan_string appends. Flex
+ * allocates it with a fixed YY_BUF_SIZE+2 entries (16386), so a longer token -
+ * e.g. a 16K+ run of plain text - overran it and corrupted the heap. The whole
+ * text is in memory, so no token is longer than it: size the buffer by the
+ * text (+3 needed; +16 for margin). Evaluated where flex allocates it, inside
+ * yylex, where yyextra is available. */
+#undef YY_STATE_BUF_SIZE
+#define YY_STATE_BUF_SIZE ((yyextra->text_size + 16) * sizeof(yy_state_type))
+
 /* "$name" (or "$param[i]") in text being expanded: the name's value; an
  * unknown name expands to nothing, and is recorded for the end-of-run
  * warning. */
@@ -166,7 +178,7 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
     return expand_name(yyextra, yytext + 1);
 }
 
-<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>#(params|args|line|col) {
+<INITIAL,EXPECT_PARAMS_STATE,EXPECT_ARGS_STATE>#(params|args|line|col|id) {
     std::optional<std::string> cv = yyextra->context_value(yytext);
     if (cv) {
         return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);
@@ -181,7 +193,7 @@ ID  [a-zA-Z][a-zA-Z0-9_]*
     return value_name(yyextra, yytext);
 }
 
-<PARAM_VALUES_STATE,ARG_VALUES_STATE>#(params|args|line|col) {
+<PARAM_VALUES_STATE,ARG_VALUES_STATE>#(params|args|line|col|id) {
     IN_VALUE;
     std::optional<std::string> cv = yyextra->context_value(yytext);
     if (cv) {
@@ -397,7 +409,7 @@ required|keep_left_ws|klws|keep_right_ws|krws|keep_enclosing_ws|kws|quoted|bool 
     return value_name(yyextra, yytext);
 }
 
-<LP_STATE,LA_STATE>#(params|args|line|col) {
+<LP_STATE,LA_STATE>#(params|args|line|col|id) {
     std::optional<std::string> cv = yyextra->context_value(yytext);
     if (cv) {
         return noise::DocParser::make_CONTEXT_VALUE(*cv, yyextra->loc);

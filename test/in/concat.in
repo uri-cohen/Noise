@@ -1,0 +1,7 @@
+Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+1. args are trimmed: [$concat(a , b, c)]
+2. none: [$concat()] [$concat]
+3. glue without spaces: $concat(snake, _, case)
+4. an escaped comma inside an arg: [$concat(a\, b, c)]
+5. args using names: $pair(left, right)
+6. a built name is expanded: $concat($, label); with an escaped $ it is not: $concat(\$, label)

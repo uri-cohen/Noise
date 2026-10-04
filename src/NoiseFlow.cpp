@@ -29,6 +29,9 @@ NoiseFlow::NoiseFlow(uint64_t seed)
     add_macro(new SelectMacro(this));
     add_macro(new ForeachMacro(this));
     add_macro(new SubstrMacro(this));
+    add_macro(new ConcatMacro(this));
+    add_macro(new IteMacro(this));
+    add_macro(new RangeMacro(this));
 }
 
 NoiseFlow::~NoiseFlow() {

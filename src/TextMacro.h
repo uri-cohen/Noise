@@ -44,6 +44,27 @@ class ForeachMacro : public Macro {
     std::string expand(ContextManager* context_manager) override;
 };  // class ForeachMacro
 
+class RangeMacro : public Macro {
+  public:
+    RangeMacro(NoiseFlow* owner);
+    ~RangeMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class RangeMacro
+
+class IteMacro : public Macro {
+  public:
+    IteMacro(NoiseFlow* owner);
+    ~IteMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class IteMacro
+
+class ConcatMacro : public Macro {
+  public:
+    ConcatMacro(NoiseFlow* owner);
+    ~ConcatMacro() {}
+    std::string expand(ContextManager* context_manager) override;
+};  // class ConcatMacro
+
 class SubstrMacro : public Macro {
   public:
     SubstrMacro(NoiseFlow* owner);

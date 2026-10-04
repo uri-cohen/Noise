@@ -37,6 +37,7 @@ typedef noise::DocLexerExtra DocLexerExtra;
 #include <Exception.h>
 #include <Utils.h>
 #include <VarSolver.h>
+#include <Vars.h>
 
 #define yylex doc_lex
 noise::DocParser::symbol_type yylex(yyscan_t yyscanner);
@@ -47,23 +48,14 @@ void noise::DocParser::error(const location_type& l, const std::string& msg) {
                            l.end.line, l.end.column, msg));
 };
 
-static std::string lowered(const std::string& s) {
-    std::string out = s;
-    for (auto& c : out) c = std::tolower(static_cast<unsigned char>(c));
-    return out;
-}
-
-// Case-insensitive true/false spellings for a BOOL-attributed param/arg.
-// Anything else warns and falls back to the formal's own default (itself
-// normalized the same way; "false" if that isn't a valid spelling either).
+// Case-insensitive true/false spellings for a BOOL-attributed param/arg (see
+// noise::parse_bool). Anything else warns and falls back to the formal's own
+// default (itself normalized the same way; "false" if that isn't a valid
+// spelling either).
 static std::string normalize_bool(const std::string& raw, const std::string& formal_default) {
-    static const std::set<std::string> TRUE_STRINGS = {"true", "t", "yes", "y", "1", "ok"};
-    static const std::set<std::string> FALSE_STRINGS = {"false", "f", "no", "n", "0"};
-    std::string v = lowered(raw);
-    if (TRUE_STRINGS.contains(v)) return "true";
-    if (FALSE_STRINGS.contains(v)) return "false";
+    if (auto b = noise::parse_bool(raw)) return *b ? "true" : "false";
     WARNING(301, "invalid bool value '{}', using default '{}'", raw, formal_default);
-    return TRUE_STRINGS.contains(lowered(formal_default)) ? "true" : "false";
+    return noise::parse_bool(formal_default).value_or(false) ? "true" : "false";
 }
 
 static std::string apply_attrs(const std::string& value, noise::BindingAttr attrs,
@@ -87,6 +79,25 @@ static std::string apply_attrs(const std::string& value, noise::BindingAttr attr
 
 static std::string apply_attrs(const noise::Binding& b) {
     return apply_attrs(b.value(), b.attrs());
+}
+
+// A bare name - an unnamed entry whose (trimmed) value is exactly the name of
+// one of the macro's BOOL formals - is that flag set: "sorted" is
+// "sorted=true". The lexer already makes a bare name directly at an item's
+// head an ID (see is_bool_formal); this also covers one after whitespace
+// (", sorted>"), which the lexer can't tell from value text.
+static void bare_flags(const std::vector<noise::Binding>& formals,
+                       std::vector<noise::Binding>& actuals) {
+    for (auto& a : actuals) {
+        if (!a.name().empty()) continue;
+        std::string v = noise::trim(a.value());
+        for (const auto& f : formals) {
+            if (f.is_bool() && f.name() == v) {
+                a = noise::Binding(f.name(), "true", a.attrs());
+                break;
+            }
+        }
+    }
 }
 
 // Expansion Flow step 5: instantiation context mapping shared by every
@@ -143,6 +154,10 @@ static void bind_list(const std::string& macro_name,
         }
         ctx.add_map(formals[i].name(), values[i]);
         ctx.add_map(std::format("{}[{}]", prefix, i), values[i]);
+        // e.g. "param.text" vs "arg.text": tells a param and an arg of the
+        // same name apart (a later arg overwrites the plain name). Not
+        // reachable as a $name ('.' is no identifier char) - for builtins.
+        ctx.add_map(std::format("{}.{}", prefix, formals[i].name()), values[i]);
     }
     for (size_t i = 0; i < actuals.size(); ++i) {
         std::string v = apply_attrs(actuals[i]);
@@ -154,33 +169,6 @@ static void bind_list(const std::string& macro_name,
     ctx.add_map(std::format("#{}s", prefix), std::to_string(actuals.size()));
 }
 
-// Expansion Flow steps 7-8: re-expands `raw` as a fresh document, repeating
-// until the output stops changing, or throws if it doesn't within
-// max_expansions (NOISE_MAX_EXPANSIONS) rounds. Used both for a macro's own
-// body (post step 6) and, for params, right after balanced_text captures
-// their raw value (step 4).
-static std::string expand_until_stable(noise::DocLexerExtra* extra,
-                                        const std::string& raw,
-                                        const std::string& stream_id,
-                                        int64_t max_expansions) {
-    std::string prev = raw, curr;
-    int64_t iterations = 0;
-    do {
-        std::ostringstream tmp;
-        extra->owner->stream_expand(prev, stream_id, tmp);
-        curr = tmp.str();
-        if (curr == prev) {
-            break;
-        }
-        prev = curr;
-    } while (++iterations < max_expansions);
-    if (iterations >= max_expansions) {
-        throw noise::NoiseMacroCallError(std::format(
-            "possible infinite expansion while expanding '{}' - not stable "
-            "after NOISE_MAX_EXPANSIONS={} re-expansions", stream_id, max_expansions));
-    }
-    return prev;
-}
 
 // Counts one macro expansion nesting level for the guard's lifetime.
 struct DepthGuard {
@@ -197,10 +185,14 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
         throw noise::NoiseMacroCallError(std::format("unknown macro '{}'", name));
     }
     noise::Context ctx;
+    bare_flags(macro->params(), params);
+    bare_flags(macro->args(), args);
     bind_list(name, macro->params(), params, "param", ctx);
     bind_list(name, macro->args(), args, "arg", ctx);
     ctx.add_map("#line", std::to_string(extra->out_line));
     ctx.add_map("#col", std::to_string(extra->out_col));
+    // a run-wide unique invocation number, e.g. for unique labels
+    ctx.add_map("#id", std::to_string(extra->owner->context_manager()->next_id()));
 
     noise::ContextManager* cm = extra->owner->context_manager();
     cm->push(std::move(ctx));
@@ -232,7 +224,7 @@ static std::string invoke_macro(noise::DocLexerExtra* extra, const std::string& 
     }
     cm->pop();
 
-    return expand_until_stable(extra, raw, std::format("macro:{}", name), max_expansions);
+    return extra->owner->expand_until_stable(raw, std::format("macro:{}", name), max_expansions);
 }
 
 }
@@ -361,7 +353,7 @@ param:
     opt_attrs opt_id_eq balanced_text {
         int64_t max_expansions = extra->owner->context_manager()->config_int(
             noise::config::MAX_EXPANSIONS, noise::config::MAX_EXPANSIONS_DEFAULT, 1);
-        $$ = noise::Binding($2, expand_until_stable(extra, $3, "param", max_expansions), $1);
+        $$ = noise::Binding($2, extra->owner->expand_until_stable($3, "param", max_expansions), $1);
     }
     | opt_attrs ID { $$ = noise::Binding($2, "true", $1); }
     ;
