@@ -245,6 +245,33 @@ or, for the integer distributions, `fmt=x` for hex.
 
 An out-of-range parameter is an error.
 
+### Numbers
+
+| Macro | Params | Does |
+|---|---|---|
+| `expr` | `str` (required), `fmt` (none) | evaluates the expression `str` |
+| `min`, `max` | any number | the param of the least / greatest value |
+
+`expr` evaluates arithmetic, comparisons and logic with the operators and
+precedence of [constraints](#constraints) (except bit selects): integers are
+64-bit and C-like (`/` truncates, `%` keeps the dividend's sign), any real
+operand makes the result real, and comparisons and `AND`/`OR`/`XOR`/`NOT`/`->`
+give `true` or `false`; `fmt` formats the result as for the distributions.
+`str` is a param, so `$name`s in it are expanded first; anything that is still
+not a number - e.g. a name without `$` - is an error, as are division by zero
+and integer overflow. Inside the `<...>`, `<` and `>` are written `\<` and
+`\>`.
+
+`min` and `max` return the winning param as written, keeping its own
+formatting; a tie keeps the first.
+
+```
+$ echo '$expr<(1 + 2) * 3> $expr<7 / 2> $expr<7.0 / 2> $expr<3 \> 2> $expr<1 / 3.0, fmt=.3f>' | noise
+9 3 3.5 true 0.333
+$ echo '$max<1.50, 007, 3> $min<3, 1.5, 7>' | noise
+007 1.5
+```
+
 ### Text
 
 | Macro | Params | Args | Does |

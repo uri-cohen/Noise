@@ -32,6 +32,9 @@ NoiseFlow::NoiseFlow(uint64_t seed)
     add_macro(new ConcatMacro(this));
     add_macro(new IteMacro(this));
     add_macro(new RangeMacro(this));
+    add_macro(new ExprMacro(this));
+    add_macro(new MinMaxMacro(this, true));
+    add_macro(new MinMaxMacro(this, false));
 }
 
 NoiseFlow::~NoiseFlow() {
