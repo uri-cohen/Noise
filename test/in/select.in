@@ -8,3 +8,5 @@ Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 7. dups=false (default) never repeats when count fits: $select<count=3,sorted=true>(text="a b c d e")
 8. an invalid bool value warns and falls back to the default: $select<count=2,sorted=maybe>(text="a b c d")
 9. a plain bare word is still a positional value, not a flag: $show(hello)
+9. text as a param is expanded before splitting: $select<count=3, sorted, text=$range<10>>
+10. a bare flag after a space: $select<count=3, dups, sorted>(text="a b c")

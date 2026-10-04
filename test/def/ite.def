@@ -1,0 +1,12 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# ite<cond>(then_part, else_part): cond is a required bool param; only the
+# chosen part is expanded
+MACRO label = { TEXT = "L#id"; };
+MACRO size = {
+    TEXT = "$n is $ite<$big>(big, small)";
+    VARS = { UINT n; BOOL big; ASSERT n == 7; ASSERT big == (n > 5); };
+};
+MACRO greet = {
+    TEXT = "$ite<$formal>(Good day, Hi) $who";
+    PARAMS = { bool formal = false; who = there; };
+};

@@ -1,0 +1,4 @@
+# Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
+# concat(args...): $arg[0]$arg[1]...$arg[#args-1] - its args concatenated
+MACRO label = { TEXT = "L#id"; };
+MACRO pair = { TEXT = "$concat($arg[0], -, $arg[1])"; ARGS = { x = ""; y = ""; }; };

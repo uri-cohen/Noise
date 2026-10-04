@@ -140,8 +140,8 @@ definition of the param/arg):
 | `keep_enclosing_ws` (`kws`) | don't trim either side |
 | `bool` | the value is a boolean (see below) |
 
-A `bool` value accepts, case-insensitively, `true`, `t`, `yes`, `y`, `1`, `ok`
-or `false`, `f`, `no`, `n`, `0`. Anything else warns and falls back to the
+A `bool` value accepts, case-insensitively, `true`, `t`, `yes`, `y`, `1`, `ok`,
+`on` or `false`, `f`, `no`, `n`, `0`, `off` (as do `BOOL` variables). Anything else warns and falls back to the
 param's default. For a `bool` param, a bare name alone means true: `dups` is
 the same as `dups=true`.
 
@@ -214,13 +214,14 @@ text = '
 ### Inside a macro's text
 
 A macro's params and args are available by name and by position - `$count`,
-`$param[0]`, `$arg[1]`, ... Four read-only values are always available, with
+`$param[0]`, `$arg[1]`, ... Five read-only values are always available, with
 no `$`:
 
 | Name | Value |
 |---|---|
 | `#params`, `#args` | how many params/args the call passed |
 | `#line`, `#col` | where in the output this macro's expansion starts |
+| `#id` | this invocation's number: 1, 2, 3, ... over the whole run, in the order invocations start - unique, e.g. for labels (`L#id`) |
 
 A `.def` file reads its quoted text with `\` escapes of its own, so a literal
 `$` inside a macro's `TEXT` is written `\\$` there.
@@ -249,9 +250,37 @@ An out-of-range parameter is an error.
 | Macro | Params | Args | Does |
 |---|---|---|---|
 | `repeat` | | `text` (required), `count` (1) | `text` repeated `count` times |
-| `select` | `unit` (`word`), `count` (1), `dups` (false), `sorted` (false) | `text` (required) | picks `count` random items of `text` |
-| `foreach` | `unit` (`word`), `var` (`item`) | `items`, `text` (both required) | expands `text` once per item, with `var` set to it |
+| `select` | `unit` (`word`), `count` (1), `dups` (false), `sorted` (false), `text`* | `text`* | picks `count` random items of `text` |
+| `foreach` | `unit` (`word`), `var` (`item`), `items`* | `items`*, `text` (required) | expands `text` once per item, with `var` set to it |
 | `substr` | `str`, `msb` (both required), `lsb` (`msb`), `fmt` (none) | | characters `msb` down to `lsb` of `str` formatted by `fmt` |
+| `concat` | | any number | its args concatenated: `$arg[0]$arg[1]...` |
+| `ite` | `cond` (required, `bool`) | `then_part`, `else_part` (both empty) | `then_part` if `cond` is true, else `else_part` |
+| `range` | `from` (0), `to`, `step` (1) | | the integers from `from` up to, not including, `to`, space separated |
+
+`concat` glues text without spaces - `$concat(snake, _, case)` is `snake_case`;
+like any args, each is trimmed (`kws` keeps an arg's spaces). Its result is
+expanded again, so it can build a name: `$concat($, label)` is `$label`,
+expanded (an escaped `\$` stays a literal `$`).
+
+`ite` reads `cond` with the `bool` spellings - anything else warns and counts as
+false - so a computed condition comes from a `BOOL` variable or a param:
+`$ite<$big>(big, small)`. The parts are args, passed unexpanded, so only the
+chosen one is ever expanded: the other's macros never run (no random draws, no
+`#id`s, no unknown-name warnings).
+
+`range` follows Python's `range`: `$range<4>` is `0 1 2 3`, `$range<2, 8, 3>`
+is `2 5`, and a negative `step` counts down (`$range<5, 0, -2>` is `5 3 1`);
+an empty range yields nothing. The values must be integers, `step` can't be 0,
+and a range of more than [`NOISE_MAX_RANGE`](#configuration-params) items is an
+error.
+
+\* `select`'s `text` and `foreach`'s `items` - the text split into items - are
+given either as a param or as an arg (one of them, not both), which decides
+when they are expanded: a param is expanded before the macro runs, so its
+items are those of the result - `$foreach<items=$range<1, 4>>(text=...)` loops
+over `1 2 3`; an arg is split as written, and each chosen item is expanded only
+as part of the output - `$select(text=$a $b $c)` expands just the item it
+picks. With `items` as a param, name `foreach`'s body: `(text=...)`.
 
 A `unit` is `word`, `line` or `paragraph`. `select` picks each item at most
 once, in random order; `dups` allows repeats (implied when `count` exceeds the
@@ -432,6 +461,7 @@ to everything expanded within that scope.
 | `NOISE_MAX_PROBES` | 128 | solver checks spent picking one variable's random value; `0` takes the solver's first solution, the same for every seed |
 | `NOISE_REAL_RANGE` | 1e9 | a `REAL` variable is picked within `[-range, range]` |
 | `NOISE_MAX_UNKNOWN_WARNING` | 10 | unknown `$name`s listed in the end-of-run warning itself; more go to a details file |
+| `NOISE_MAX_RANGE` | 1024 | max number of items a `range` may generate |
 
 ```
 $ echo '$dice / $dice' | noise -d examples/dice.def -D NOISE_MAX_PROBES=0 -s 1

@@ -34,6 +34,9 @@ inline constexpr int64_t MAX_EXPANSIONS_DEFAULT = 64;
 // than this many go to a details file the warning refers to
 inline constexpr const char* MAX_UNKNOWN_WARNING = "NOISE_MAX_UNKNOWN_WARNING";
 inline constexpr int64_t MAX_UNKNOWN_WARNING_DEFAULT = 10;
+// max number of items a range macro may generate
+inline constexpr const char* MAX_RANGE = "NOISE_MAX_RANGE";
+inline constexpr int64_t MAX_RANGE_DEFAULT = 1024;
 }  // namespace config
 
 class Context {
@@ -93,6 +96,9 @@ class ContextManager {
 
     std::optional<const std::string> get(const std::string& name);
 
+    /// The next macro invocation id (#id): 1, 2, 3, ... over the whole run.
+    uint64_t next_id() { return ++_last_id; }
+
     /// A configuration param's current value (see namespace config), or
     /// dflt if not set. Throws NoiseValueError if it is set to a value that
     /// is not a number, or is below min (for a real: not above min).
@@ -103,6 +109,7 @@ class ContextManager {
     std::map<std::string, std::string> _mapper;
     std::map<std::string, std::vector<std::string>> _shadows;
     std::vector<Context> _contexts;
+    uint64_t _last_id = 0;
 };
 
 }; // namespace noise

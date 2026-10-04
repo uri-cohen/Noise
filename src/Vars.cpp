@@ -122,8 +122,8 @@ void VarBlock::add_smtlib(const string& code) {
 }
 
 std::optional<bool> parse_bool(const string& text) {
-    static const std::set<string> TRUE_STRINGS = {"true", "t", "yes", "y", "1", "ok"};
-    static const std::set<string> FALSE_STRINGS = {"false", "f", "no", "n", "0"};
+    static const std::set<string> TRUE_STRINGS = {"true", "t", "yes", "y", "1", "ok", "on"};
+    static const std::set<string> FALSE_STRINGS = {"false", "f", "no", "n", "0", "off"};
     string v = trim(text);
     for (auto& c : v) {
         c = std::tolower(static_cast<unsigned char>(c));

@@ -10,3 +10,4 @@ still first
 
 second para", kws text="$wrap(value=$p)
 ")
+5. items as a param are expanded before splitting: $foreach<items=$range<1, 4>>(kws text="<$item>")

@@ -80,6 +80,7 @@ DocBuilder::DocBuilder(NoiseFlow* owner, const std::string& stream_id, std::ostr
 
 int DocBuilder::parse(const std::string& input_text) {
     yyscan_t scanner;
+    _lexer_extra.text_size = input_text.size();
     doc_lex_init_extra(&_lexer_extra, &scanner);
     YY_BUFFER_STATE buf = doc__scan_string(input_text.c_str(), scanner);
     int res = -1;

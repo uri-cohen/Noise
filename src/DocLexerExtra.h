@@ -42,6 +42,8 @@ struct DocLexerExtra {
     NoiseFlow* owner;
     std::string stream_id;
     std::ostream* out;
+    // size of the text being scanned (sizes flex's yy_state_buf, DocLexer.l)
+    size_t text_size = 0;
     uint32_t out_line;
     uint32_t out_col;
 
