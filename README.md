@@ -441,3 +441,8 @@ $ echo '$dice / $dice' | noise -d examples/dice.def -D NOISE_MAX_PROBES=0 -s 1
 Each probe is a solver check, and checks involving `*`, `/` or `%` on 64-bit
 `INT`/`UINT` variables are relatively expensive; a smaller `BITVEC[w]` is
 cheaper when the range allows it.
+
+## Related work
+
+For how noise compares with random text generators, constrained random tools,
+macro processors and test data generators, see [RELATED_WORK.md](RELATED_WORK.md).
