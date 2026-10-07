@@ -34,6 +34,7 @@ function(add_cli_test test_name)
             -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
             -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
             -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
+            -DACTUAL_FILE=${CMAKE_CURRENT_BINARY_DIR}/actual/${test_name}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_test.cmake
     )
 endfunction()
@@ -51,6 +52,7 @@ function(add_cli_error_test test_name)
             -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
             -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
             -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
+            -DACTUAL_FILE=${CMAKE_CURRENT_BINARY_DIR}/actual/${test_name}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_test.cmake
     )
 endfunction()
@@ -67,6 +69,7 @@ function(add_cli_warning_test test_name)
             -DDEF_FILE=${CMAKE_CURRENT_SOURCE_DIR}/def/${test_name}.def
             -DIN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/in/${test_name}.in
             -DEXPECTED_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.ex
+            -DACTUAL_FILE=${CMAKE_CURRENT_BINARY_DIR}/actual/${test_name}
             -DWARN_FILE=${CMAKE_CURRENT_SOURCE_DIR}/expected/${test_name}.err
             -P ${CMAKE_CURRENT_SOURCE_DIR}/run_cli_test.cmake
     )

@@ -123,7 +123,7 @@ comma-separated and may be empty. Each entry has the form
 
 - An entry with `name=` binds the macro's param/arg of that name; entries
   without a name bind the remaining ones in order. The entry's own name takes
-  no `$`; a value that uses a name does: `$repeat(text=$word, count=3)`.
+  no `$`; a value that uses a name does: `$repeat<count=$n>(text=$word)`.
 - A value runs up to the next unescaped `,` or closing bracket. Nested
   `(...)` and `<...>` groups are kept whole, so `f(a,b)` is one value.
 - Leading and trailing whitespace of a value is trimmed.
@@ -315,7 +315,7 @@ $ echo '$max<1.50, 007, 3> $min<3, 1.5, 7>' | noise
 
 | Macro | Params | Args | Does |
 |---|---|---|---|
-| `repeat` | | `text` (required), `count` (1) | `text` repeated `count` times |
+| `repeat` | `count` (1) | `text` (required) | `text` repeated `count` times |
 | `select` | `unit` (`word`), `count` (1), `dups` (false), `sorted` (false), `text`* | `text`* | picks `count` random items of `text` |
 | `foreach` | `unit` (`word`), `var` (`item`), `items`* | `items`*, `text` (required) | expands `text` once per item, with `var` set to it |
 | `substr` | `str`, `msb` (both required), `lsb` (`msb`), `fmt` (none) | | characters `msb` down to `lsb` of `str` formatted by `fmt` |
@@ -371,7 +371,7 @@ alignment (`fmt=\>8`). Like any macro's output, the result is expanded again,
 so a selection containing `$name` text is expanded too.
 
 ```
-$ echo '$uniform_dist<a=1, b=6, fmt=.0f> | $select<count=2>(text=red green blue) | $repeat(kws text="ab ", count=3)' | noise -s 3
+$ echo '$uniform_dist<a=1, b=6, fmt=.0f> | $select<count=2>(text=red green blue) | $repeat<count=3>(kws text="ab ")' | noise -s 3
 4 | green blue | ab ab ab
 $ echo '$substr<165, 7, 4, fmt=08b> $substr<Hello world, 4, 0>' | noise
 1010 world

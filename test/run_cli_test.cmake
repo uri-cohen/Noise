@@ -6,6 +6,10 @@
 # and EXPECT_ERROR: noise must then exit with status 1 and its stderr is
 # what's diffed - or WARN_FILE: noise must exit with status 0, its stdout is
 # diffed against EXPECTED_FILE and its stderr (warnings) against WARN_FILE.
+# With the NOISE_KEEP_ACTUAL environment variable set (to anything but empty)
+# noise's stdout and stderr are also kept, in ACTUAL_FILE.out and .err - e.g.
+#   NOISE_KEEP_ACTUAL=1 ctest --test-dir build/main -R cli_repeat
+#   diff test/expected/repeat.ex build/main/test/actual/repeat.out
 
 string(REPLACE "|" ";" extra_args "${EXTRA_ARGS}")
 
@@ -15,6 +19,12 @@ execute_process(
     ERROR_VARIABLE stderr_output
     RESULT_VARIABLE noise_result
 )
+
+# written before any check, so a failing test's output is kept too
+if(NOT "$ENV{NOISE_KEEP_ACTUAL}" STREQUAL "" AND ACTUAL_FILE)
+    file(WRITE "${ACTUAL_FILE}.out" "${stdout_output}")
+    file(WRITE "${ACTUAL_FILE}.err" "${stderr_output}")
+endif()
 
 if(EXPECT_ERROR)
     if(NOT noise_result EQUAL 1)
