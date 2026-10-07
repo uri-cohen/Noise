@@ -8,6 +8,6 @@ Copyrights Uri Cohen uri.l.cohen@gmail.com 2026
 7. call-site keep_left_ws on a positional arg: $show_raw_arg0(keep_left_ws "  hi  ")
 8. call-site kws (alias) on a positional arg: $show_raw_arg0(kws "  hi  ")
 9. named param: $show_params<name=world>
-10. dup text: $repeat(text=ab,count=3)
+10. dup text: $repeat<count=3>(text=ab)
 11. pick words: $select<unit=word,count=2>(text="alpha beta gamma delta")
 12. fixed random: $uniform_dist<a=5,b=5,fmt=.0f>

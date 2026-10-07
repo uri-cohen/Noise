@@ -34,7 +34,7 @@ macro echo_param = {
 # enclosing macro) even though it is just plain text at the point it is
 # first captured - balanced_text must still accept that token.
 macro wrap_deferred = {
-  text = '$repeat(count=2, text = "$echo_param<$outer>")';
+  text = '$repeat<count=2>(text = "$echo_param<$outer>")';
   params = {
     outer = "X";
   };

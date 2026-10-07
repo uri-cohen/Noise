@@ -24,7 +24,7 @@ string TextMacro::expand(ContextManager* context_manager) {
 RepeatMacro::RepeatMacro(NoiseFlow* owner) : Macro("repeat") {
     set_owner(owner);
     add_arg(Binding("text", "", BindingAttr::REQUIRED));
-    add_arg(Binding("count", "1"));
+    add_param(Binding("count", "1"));
 }
 
 string RepeatMacro::expand(ContextManager* context_manager) {
@@ -81,14 +81,16 @@ string param_or_arg(Macro* macro, ContextManager* cm, const string& name,
     string p = cm->get("param." + name).value_or(NOT_GIVEN);
     string a = cm->get("arg." + name).value_or(NOT_GIVEN);
     if (p != NOT_GIVEN && a != NOT_GIVEN) {
-        throw NoiseMacroCallError(format(
-            "{} got '{}' both as a param and as an arg - give it as one of them{}",
-            macro->name(), name, hint));
+        throw NoiseMacroCallError(
+            format("{} got '{}' both as a param and as an arg - give it as one "
+                   "of them{}",
+                   macro->name(), name, hint));
     }
     if (p == NOT_GIVEN && a == NOT_GIVEN) {
-        throw NoiseMacroCallError(format(
-            "{} needs '{}', as a param (expanded first) or as an arg (as written)",
-            macro->name(), name));
+        throw NoiseMacroCallError(
+            format("{} needs '{}', as a param (expanded first) or as an arg "
+                   "(as written)",
+                   macro->name(), name));
     }
     return p != NOT_GIVEN ? p : a;
 }
@@ -162,9 +164,9 @@ ForeachMacro::ForeachMacro(NoiseFlow* owner) : Macro("foreach") {
 }
 
 string ForeachMacro::expand(ContextManager* context_manager) {
-    string items = param_or_arg(
-        this, context_manager, "items",
-        " (with items as a param, name the body: foreach<items=...>(text=...))");
+    string items = param_or_arg(this, context_manager, "items",
+                                " (with items as a param, name the body: "
+                                "foreach<items=...>(text=...))");
     if (context_manager->get("arg.text").value_or(NOT_GIVEN) == NOT_GIVEN) {
         throw NoiseMacroCallError("foreach needs its body, the 'text' arg");
     }
@@ -220,8 +222,8 @@ string format_value(const string& str, const string& fmt) {
         }
         return std::vformat(spec, std::make_format_args(str));
     } catch (const std::format_error& e) {
-        throw NoiseValueError(format(
-            "substr fmt '{}' can't format '{}': {}", fmt, str, e.what()));
+        throw NoiseValueError(format("substr fmt '{}' can't format '{}': {}",
+                                     fmt, str, e.what()));
     }
 }
 
@@ -255,9 +257,11 @@ string SubstrMacro::expand(ContextManager* context_manager) {
     uint64_t msb = position("msb", msb_text);
     uint64_t lsb = trim(lsb_text).empty() ? msb : position("lsb", lsb_text);
     if (lsb > msb || msb >= length) {
-        throw NoiseValueError(format(
-            "substr [{}:{}] is invalid for '{}' ({} characters; 0 <= lsb <= msb < {} "
-            "is required)", msb, lsb, text, length, length));
+        throw NoiseValueError(
+            format("substr [{}:{}] is invalid for '{}' ({} characters; 0 <= "
+                   "lsb <= msb < {} "
+                   "is required)",
+                   msb, lsb, text, length, length));
     }
     // position p (from the right) is character length-1-p from the left
     size_t first = length - 1 - msb;
@@ -287,7 +291,8 @@ string ConcatMacro::expand(ContextManager* context_manager) {
 // random draws, no #id, no unknown-name warnings).
 IteMacro::IteMacro(NoiseFlow* owner) : Macro("ite") {
     set_owner(owner);
-    add_param(Binding("cond", "false", BindingAttr::REQUIRED | BindingAttr::BOOL));
+    add_param(
+        Binding("cond", "false", BindingAttr::REQUIRED | BindingAttr::BOOL));
     add_arg(Binding("then_part", ""));
     add_arg(Binding("else_part", ""));
 }
@@ -315,7 +320,8 @@ string RangeMacro::expand(ContextManager* context_manager) {
     // range<n>: a lone param is `to`, as in Python's range(stop)
     if (trim(to_text).empty()) {
         if (context_manager->get("#params").value_or("0") != "1") {
-            throw NoiseValueError("range needs `to`: range<to> or range<from, to[, step]>");
+            throw NoiseValueError(
+                "range needs `to`: range<to> or range<from, to[, step]>");
         }
         to_text = from_text;
         from_text = "0";
@@ -323,7 +329,8 @@ string RangeMacro::expand(ContextManager* context_manager) {
     auto integer = [](const string& name, const string& text) {
         auto v = parse_int64(text);
         if (!v) {
-            throw NoiseValueError(format("range {} '{}' is not an integer", name, text));
+            throw NoiseValueError(
+                format("range {} '{}' is not an integer", name, text));
         }
         return *v;
     };
@@ -331,17 +338,19 @@ string RangeMacro::expand(ContextManager* context_manager) {
     int64_t to = integer("to", to_text);
     int64_t step = integer("step", step_text);
     if (step == 0) {
-        throw NoiseValueError("range step must not be 0 (the range would be infinite)");
+        throw NoiseValueError(
+            "range step must not be 0 (the range would be infinite)");
     }
     // Python's len(range(from, to, step)), in 128 bits so nothing overflows
     __int128 span = step > 0 ? __int128(to) - from : __int128(from) - to;
     __int128 by = step > 0 ? __int128(step) : -__int128(step);
     __int128 count = span <= 0 ? 0 : (span + by - 1) / by;
-    int64_t max = context_manager->config_int(config::MAX_RANGE, config::MAX_RANGE_DEFAULT, 0);
+    int64_t max = context_manager->config_int(config::MAX_RANGE,
+                                              config::MAX_RANGE_DEFAULT, 0);
     if (count > max) {
-        throw NoiseValueError(format(
-            "range<{}, {}, {}> has {} items - over NOISE_MAX_RANGE={}", from, to, step,
-            static_cast<long double>(count), max));
+        throw NoiseValueError(
+            format("range<{}, {}, {}> has {} items - over NOISE_MAX_RANGE={}",
+                   from, to, step, static_cast<long double>(count), max));
     }
     std::ostringstream out;
     __int128 v = from;
